@@ -1,0 +1,95 @@
+from unittest.mock import AsyncMock
+
+import pytest
+import pytest_asyncio
+import respx
+from httpx import ASGITransport, AsyncClient, Response
+
+from gm.core.config import settings
+from gm.main import app
+
+
+@pytest.fixture(scope="session")
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.fixture(autouse=True)
+def mock_database(monkeypatch):
+    """
+    실제 DB 연결을 차단하고 Mock으로 대체합니다.
+    """
+    mock_connect = AsyncMock()
+    mock_disconnect = AsyncMock()
+    mock_fetchval = AsyncMock(return_value=1)
+    mock_execute = AsyncMock()
+    mock_fetch = AsyncMock(return_value=[])
+    mock_fetchrow = AsyncMock(return_value=None)
+
+    monkeypatch.setattr("gm.db.database.Database.connect", mock_connect)
+    monkeypatch.setattr("gm.db.database.Database.disconnect", mock_disconnect)
+    monkeypatch.setattr("gm.db.database.Database.fetchval", mock_fetchval)
+    monkeypatch.setattr("gm.db.database.Database.execute", mock_execute)
+    monkeypatch.setattr("gm.db.database.Database.fetch", mock_fetch)
+    monkeypatch.setattr("gm.db.database.Database.fetchrow", mock_fetchrow)
+
+
+@pytest.fixture(autouse=True)
+def mock_external_services():
+    """
+    respx를 사용하여 외부 서비스 호출을 가로챕니다.
+    """
+    with respx.mock(assert_all_called=False) as respx_mock:
+        # Rule Manager
+        respx_mock.post(f"{settings.RULE_SERVICE_URL}/api/v1/rule/check").mock(
+            return_value=Response(
+                200,
+                json={
+                    "description": "Mock Rule Check",
+                    "success": True,
+                    "suggested_diffs": [{"entity_id": "dummy", "diff": {"hp": 90}}],
+                    "required_entities": [],
+                    "value_range": None,
+                },
+            )
+        )
+
+        # Scenario Manager
+        respx_mock.post(f"{settings.SCENARIO_SERVICE_URL}/api/v1/scenario/check").mock(
+            return_value=Response(
+                200,
+                json={
+                    "constraint_type": "advisory",
+                    "description": "Mock Scenario Check",
+                    "correction_diffs": [],
+                    "narrative_slot": None,
+                },
+            )
+        )
+
+        # State Manager
+        respx_mock.post(f"{settings.STATE_SERVICE_URL}/api/v1/state/commit").mock(
+            return_value=Response(
+                200, json={"commit_id": "mock_commit_12345", "status": "success"}
+            )
+        )
+
+        # LLM Gateway: Narrative
+        respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative").mock(
+            return_value=Response(200, json={"narrative": "Mock Narrative Result"})
+        )
+
+        # LLM Gateway: NPC Action
+        respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/llm/npc-action").mock(
+            return_value=Response(200, json={"action_text": "NPC Mock Action"})
+        )
+
+        yield respx_mock
+
+
+@pytest_asyncio.fixture(scope="function")
+async def client():
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as c:
+        yield c
