@@ -22,6 +22,26 @@ class GMService:
         self.llm_client = LLMGatewayClient()
 
     async def process_player_turn(self, user_input: UserInput) -> Dict[str, Any]:
+        return await self._process_turn_internal(user_input)
+
+    async def process_npc_turn(self, session_id: str) -> Dict[str, Any]:
+        # 1. 컨텍스트 수집 (State/Scenario 등에서 조회해야 하나 현재는 간소화)
+        context = {"summary": "이전 턴 상황 요약..."}
+
+        # 2. NPC 행동 생성
+        npc_action_text = await self.llm_client.generate_npc_action(session_id, context)
+
+        # 3. UserInput 형태로 변환 (NPC도 시스템상 하나의 입력 주체로 취급)
+        npc_input = UserInput(session_id=session_id, content=npc_action_text)
+
+        # 4. 공통 파이프라인 실행
+        result = await self._process_turn_internal(npc_input)
+
+        # NPC 턴임을 알리는 메타데이터 추가 가능
+        result["is_npc_turn"] = True
+        return result
+
+    async def _process_turn_internal(self, user_input: UserInput) -> Dict[str, Any]:
         # 1. turn_id 생성
         # 설계에 따라 DB에서 마지막 seq를 조회해야 함
         turn_seq = await self._get_next_turn_seq(user_input.session_id)
@@ -148,7 +168,7 @@ class GMService:
             )
         except Exception as e:
             # 로그 저장 실패가 메인 로직을 중단시켜야 하는가?
-            # 데이터 정합성을 위해서는 실패 시 트랜잭션 롤백이 맞지만, 
+            # 데이터 정합성을 위해서는 실패 시 트랜잭션 롤백이 맞지만,
             # 현재 구조에서는 로그만 남김.
             print(f"Failed to save play log: {e}")
             raise e

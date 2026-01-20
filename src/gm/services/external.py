@@ -39,4 +39,13 @@ class LLMGatewayClient:
         self, turn_id: str, commit_id: str, input_text: str, outcome: RuleOutcome
     ) -> str:
         # TODO: Implement HTTP call to LLM Gateway
-        return f"당신의 행동 '{input_text}'에 대한 결과입니다. (판정: {outcome.description})"
+        return (
+            f"당신의 행동 '{input_text}'에 대한 결과입니다."
+            f"(판정: {outcome.description})"
+        )
+
+    async def generate_npc_action(
+        self, session_id: str, context: Dict[str, Any]
+    ) -> str:
+        # TODO: Implement HTTP call to LLM Gateway to generate NPC action
+        return "NPC가 주변을 경계하며 천천히 다가옵니다."
