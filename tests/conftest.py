@@ -2,8 +2,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
+import respx
+from httpx import ASGITransport, AsyncClient, Response
 
+from gm.core.config import settings
 from gm.main import app
 
 
@@ -17,20 +19,13 @@ def mock_database(monkeypatch):
     """
     실제 DB 연결을 차단하고 Mock으로 대체합니다.
     """
-    # 1. Mock 메서드 생성
     mock_connect = AsyncMock()
     mock_disconnect = AsyncMock()
-
-    # _get_next_turn_seq에서 호출 시 1을 반환 (첫 번째 턴)
-    # health check의 'SELECT 1'도 1을 반환하므로 호환됨
     mock_fetchval = AsyncMock(return_value=1)
-
     mock_execute = AsyncMock()
     mock_fetch = AsyncMock(return_value=[])
     mock_fetchrow = AsyncMock(return_value=None)
 
-    # 2. gm.db.database.Database 클래스의 메서드들을 교체
-    # gm.db.database.db는 Database 클래스 자체를 가리킴
     monkeypatch.setattr("gm.db.database.Database.connect", mock_connect)
     monkeypatch.setattr("gm.db.database.Database.disconnect", mock_disconnect)
     monkeypatch.setattr("gm.db.database.Database.fetchval", mock_fetchval)
@@ -39,10 +34,61 @@ def mock_database(monkeypatch):
     monkeypatch.setattr("gm.db.database.Database.fetchrow", mock_fetchrow)
 
 
+@pytest.fixture(autouse=True)
+def mock_external_services():
+    """
+    respx를 사용하여 외부 서비스 호출을 가로챕니다.
+    """
+    with respx.mock(assert_all_called=False) as respx_mock:
+        # Rule Manager
+        respx_mock.post(f"{settings.RULE_SERVICE_URL}/api/v1/rule/check").mock(
+            return_value=Response(
+                200,
+                json={
+                    "description": "Mock Rule Check",
+                    "success": True,
+                    "suggested_diffs": [{"entity_id": "dummy", "diff": {"hp": 90}}],
+                    "required_entities": [],
+                    "value_range": None,
+                },
+            )
+        )
+
+        # Scenario Manager
+        respx_mock.post(f"{settings.SCENARIO_SERVICE_URL}/api/v1/scenario/check").mock(
+            return_value=Response(
+                200,
+                json={
+                    "constraint_type": "advisory",
+                    "description": "Mock Scenario Check",
+                    "correction_diffs": [],
+                    "narrative_slot": None,
+                },
+            )
+        )
+
+        # State Manager
+        respx_mock.post(f"{settings.STATE_SERVICE_URL}/api/v1/state/commit").mock(
+            return_value=Response(
+                200, json={"commit_id": "mock_commit_12345", "status": "success"}
+            )
+        )
+
+        # LLM Gateway: Narrative
+        respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative").mock(
+            return_value=Response(200, json={"narrative": "Mock Narrative Result"})
+        )
+
+        # LLM Gateway: NPC Action
+        respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/llm/npc-action").mock(
+            return_value=Response(200, json={"action_text": "NPC Mock Action"})
+        )
+
+        yield respx_mock
+
+
 @pytest_asyncio.fixture(scope="function")
 async def client():
-    # lifespan 관리는 httpx.AsyncClient가 app을 실행할 때 처리됨
-    # Mock핑 되었으므로 실제 DB 연결은 발생하지 않음
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as c:

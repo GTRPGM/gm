@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "gm_db"
 
+    # External Services
+    STATE_SERVICE_URL: str = "http://localhost:8030"
+    SCENARIO_SERVICE_URL: str = "http://localhost:8040"
+    RULE_SERVICE_URL: str = "http://localhost:8050"
+    LLM_GATEWAY_URL: str = "http://localhost:8060"
+
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True)
 
     @property

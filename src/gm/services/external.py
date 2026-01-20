@@ -1,51 +1,78 @@
 from typing import Any, Dict
 
+import httpx
+
+from gm.core.config import settings
 from gm.schemas.rule import RuleOutcome
-from gm.schemas.scenario import ScenarioConstraintType, ScenarioSuggestion
+from gm.schemas.scenario import ScenarioSuggestion
 from gm.schemas.state import EntityDiff
 
 
 class RuleManagerClient:
     async def get_proposal(self, content: str) -> RuleOutcome:
-        # TODO: Implement HTTP call to Rule Manager
-        return RuleOutcome(
-            description="기본 룰 판정",
-            success=True,
-            suggested_diffs=[{"entity_id": "dummy", "diff": {"status": "updated"}}],
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.RULE_SERVICE_URL}/api/v1/rule/check",
+                json={"input_text": content, "context": {}},
+            )
+            response.raise_for_status()
+            return RuleOutcome(**response.json())
 
 
 class ScenarioManagerClient:
     async def get_proposal(
         self, content: str, rule_outcome: RuleOutcome
     ) -> ScenarioSuggestion:
-        # TODO: Implement HTTP call to Scenario Manager
-        return ScenarioSuggestion(
-            constraint_type=ScenarioConstraintType.ADVISORY,
-            description="시나리오 영향 없음",
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.SCENARIO_SERVICE_URL}/api/v1/scenario/check",
+                json={
+                    "input_text": content,
+                    "rule_outcome": rule_outcome.model_dump(),
+                },
+            )
+            response.raise_for_status()
+            return ScenarioSuggestion(**response.json())
 
 
 class StateManagerClient:
     async def commit(self, turn_id: str, diffs: list[EntityDiff]) -> Dict[str, Any]:
-        # TODO: Implement HTTP call to State Manager
-        import uuid
-
-        return {"commit_id": f"commit_{uuid.uuid4().hex[:8]}", "status": "success"}
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.STATE_SERVICE_URL}/api/v1/state/commit",
+                json={
+                    "turn_id": turn_id,
+                    "diffs": [d.model_dump() for d in diffs],
+                },
+            )
+            response.raise_for_status()
+            return response.json()
 
 
 class LLMGatewayClient:
     async def generate_narrative(
         self, turn_id: str, commit_id: str, input_text: str, outcome: RuleOutcome
     ) -> str:
-        # TODO: Implement HTTP call to LLM Gateway
-        return (
-            f"당신의 행동 '{input_text}'에 대한 결과입니다."
-            f"(판정: {outcome.description})"
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative",
+                json={
+                    "turn_id": turn_id,
+                    "commit_id": commit_id,
+                    "input_text": input_text,
+                    "rule_outcome": outcome.model_dump(),
+                },
+            )
+            response.raise_for_status()
+            return response.json()["narrative"]
 
     async def generate_npc_action(
         self, session_id: str, context: Dict[str, Any]
     ) -> str:
-        # TODO: Implement HTTP call to LLM Gateway to generate NPC action
-        return "NPC가 주변을 경계하며 천천히 다가옵니다."
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.LLM_GATEWAY_URL}/api/v1/llm/npc-action",
+                json={"session_id": session_id, "context": context},
+            )
+            response.raise_for_status()
+            return response.json()["action_text"]
