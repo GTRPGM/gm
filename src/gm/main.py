@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,19 +9,31 @@ from gm.db.database import db
 from gm.db.init_db import init_db
 
 
+async def connect_and_init_db():
+    """백그라운드에서 DB 연결 및 초기화를 시도합니다."""
+    try:
+        await asyncio.wait_for(db.connect(), timeout=3.0)
+
+        if db._pool:
+            await init_db()
+            print("Database initialized successfully.")
+
+    except asyncio.TimeoutError:
+        print("Database connection timed out. Server running without DB.")
+    except Exception as e:
+        print(f"Database connection failed: {e}. Server running without DB.")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    try:
-        await db.connect()
-        await init_db()
-    except Exception as e:
-        print(f"Failed to connect to database: {e}")
-
+    asyncio.create_task(connect_and_init_db())
+    print("Server starting... Swagger UI: http://localhost:8000/docs")
     yield
 
-    # Shutdown
-    await db.disconnect()
+    try:
+        await db.disconnect()
+    except Exception as e:
+        print(f"Error disconnecting from database: {e}")
 
 
 app = FastAPI(

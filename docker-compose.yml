@@ -8,8 +8,21 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=gm_db
+      # Mock Services Configuration
+      - STATE_SERVICE_URL=http://mock-services:8000
+      - SCENARIO_SERVICE_URL=http://mock-services:8000
+      - RULE_SERVICE_URL=http://mock-services:8000
+      - LLM_GATEWAY_URL=http://mock-services:8000
     depends_on:
       - postgres-db
+      - mock-services
+    networks:
+      - gm-network
+
+  mock-services:
+    build: ./mock_services
+    ports:
+      - "8001:8000"  # Expose mock service on host 8001 for debugging
     networks:
       - gm-network
 
