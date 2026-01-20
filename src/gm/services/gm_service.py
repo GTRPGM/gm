@@ -61,10 +61,29 @@ class GMService:
         # 5. State Manager 커밋
         commit_result = await self.state_client.commit(turn_id, final_diffs)
 
-        # 6. LLM Gateway 서술 생성
-        narrative = await self.llm_client.generate_narrative(
-            turn_id, commit_result["commit_id"], user_input.content, rule_proposal
-        )
+        # 6. LLM Gateway 서술 생성 (재시도 로직 포함)
+        narrative = ""
+        max_retries = 3
+        required_slot = scenario_proposal.narrative_slot
+
+        for attempt in range(max_retries):
+            narrative = await self.llm_client.generate_narrative(
+                turn_id, commit_result["commit_id"], user_input.content, rule_proposal
+            )
+
+            # 필수 슬롯 검증
+            if required_slot and required_slot not in narrative:
+                print(
+                    f"Narrative missing required slot '{required_slot}'. "
+                    f"Retrying ({attempt + 1}/{max_retries})..."
+                )
+                continue
+
+            # 성공 시 루프 탈출
+            break
+
+        if required_slot and required_slot not in narrative:
+            print(f"Failed to include narrative slot '{required_slot}' after retries.")
 
         # 7. Play Log 기록
         await self._save_play_log(
