@@ -10,6 +10,9 @@ COMMAND=$1
 shift
 
 case "$COMMAND" in
+    run)
+        uv run uvicorn gm.main:app --host localhost --port 8000 --reload
+        ;;
     lint)
         echo "Running Ruff Linter & Formatter..."
         uvx ruff check ../. --fix
