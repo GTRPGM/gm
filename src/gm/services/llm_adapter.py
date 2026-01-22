@@ -73,14 +73,14 @@ class NarrativeChatModel(BaseChatModel):
         schema_messages = [self._convert_message_to_schema(m) for m in messages]
 
         request_body = ChatCompletionRequest(
-            model="gpt-4",  # Could be parametrized if needed
+            model=settings.LLM_MODEL_NAME,
             messages=schema_messages,
             temperature=kwargs.get("temperature", 0.7),
-            max_tokens=kwargs.get("max_tokens", 0),
+            max_tokens=kwargs.get("max_tokens"),
         )
 
         response = await self.client.post(
-            f"{self.base_url}/api/v1/llm/narrative",
+            f"{self.base_url}/api/v1/chat/completions",
             json=request_body.model_dump(exclude_none=True),
         )
         response.raise_for_status()

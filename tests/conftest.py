@@ -75,7 +75,7 @@ def mock_external_services():
         )
 
         # LLM Gateway: Narrative
-        respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative").mock(
+        respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/chat/completions").mock(
             return_value=Response(
                 200,
                 json={

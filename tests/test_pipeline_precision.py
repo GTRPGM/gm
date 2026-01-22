@@ -76,7 +76,7 @@ async def test_conflict_resolution_scenario_wins(mock_external_services):
 
     # LLM: Standard
     mock_external_services.post(
-        f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative"
+        f"{settings.LLM_GATEWAY_URL}/api/v1/chat/completions"
     ).mock(
         return_value=Response(
             200, json=create_chat_completion_response("Conflict resolved.")
@@ -147,7 +147,7 @@ async def test_narrative_retry_logic(mock_external_services):
 
     # LLM: First attempt fail, Second attempt success
     llm_route = mock_external_services.post(
-        f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative"
+        f"{settings.LLM_GATEWAY_URL}/api/v1/chat/completions"
     )
     llm_route.side_effect = [
         Response(
@@ -213,7 +213,7 @@ async def test_pipeline_halts_on_state_error(mock_external_services):
 
     # LLM should NOT be called
     llm_route = mock_external_services.post(
-        f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative"
+        f"{settings.LLM_GATEWAY_URL}/api/v1/chat/completions"
     ).mock(
         return_value=Response(
             200, json=create_chat_completion_response("Should not see this")
@@ -286,7 +286,7 @@ async def test_npc_turn_workflow(mock_external_services):
 
     # Narrative Generation
     mock_external_services.post(
-        f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative"
+        f"{settings.LLM_GATEWAY_URL}/api/v1/chat/completions"
     ).mock(
         return_value=Response(
             200, json=create_chat_completion_response("The NPC attacks!")

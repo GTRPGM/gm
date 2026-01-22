@@ -85,14 +85,26 @@ async def commit_state(request: StateCommitRequest):
     }
 
 
-@app.post("/api/v1/llm/narrative")
-async def generate_narrative(request: NarrativeRequest):
-    print(f"[LLM] Generating narrative for turn {request.turn_id}")
+@app.post("/api/v1/chat/completions")
+async def generate_narrative(request: Dict[str, Any]):
+    print(f"[LLM] Generating narrative. Messages: {request.get('messages')}")
+    content = "As you attempt your action, the mock gods smile upon you."
+
     return {
-        "narrative": (
-            f"As you attempt to '{request.input_text}', "
-            "the world reacts accordingly. The mock gods smile upon you."
-        )
+        "id": "chatcmpl-mock-123",
+        "object": "chat.completion",
+        "created": 1677652288,
+        "model": "gpt-4",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": content,
+                },
+                "finish_reason": "stop",
+            }
+        ],
     }
 
 

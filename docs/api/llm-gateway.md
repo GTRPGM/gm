@@ -6,7 +6,7 @@ GM Core가 자연어 서술 및 NPC 행동 생성을 위해 호출하는 인터�
 
 확정된 판정 결과를 바탕으로 사용자에게 보여줄 결과 서술을 생성합니다.
 
-- **Endpoint**: `POST /api/v1/llm/narrative`
+- **Endpoint**: `POST /api/v1/chat/completions`
 - **Request Body**:
 
 ```json
