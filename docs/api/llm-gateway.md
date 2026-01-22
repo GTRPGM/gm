@@ -11,10 +11,31 @@ GM Core가 자연어 서술 및 NPC 행동 생성을 위해 호출하는 인터�
 
 ```json
 {
-  "turn_id": "string",
-  "commit_id": "string",
-  "input_text": "string",
-  "rule_outcome": "object"
+  "model": "string",
+  "messages": [
+    {
+      "role": "system",
+      "content": "string",
+      "tool_calls": [
+        {
+          "additionalProp1": {}
+        }
+      ],
+      "tool_call_id": "string"
+    }
+  ],
+  "temperature": 0.7,
+  "max_tokens": 0,
+  "stream": false,
+  "response_format": {
+    "additionalProp1": {}
+  },
+  "tools": [
+    {
+      "additionalProp1": {}
+    }
+  ],
+  "tool_choice": "string"
 }
 ```
 
@@ -22,7 +43,26 @@ GM Core가 자연어 서술 및 NPC 행동 생성을 위해 호출하는 인터�
 
 ```json
 {
-  "narrative": "string (LLM이 생성한 자연어 결과)"
+  "id": "string",
+  "object": "chat.completion",
+  "created": 0,
+  "model": "string",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "system",
+        "content": "string",
+        "tool_calls": [
+          {
+            "additionalProp1": {}
+          }
+        ],
+        "tool_call_id": "string"
+      },
+      "finish_reason": "string"
+    }
+  ]
 }
 ```
 
