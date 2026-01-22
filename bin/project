@@ -13,6 +13,9 @@ case "$COMMAND" in
     run)
         uv run uvicorn gm.main:app --host localhost --port 8020 --reload
         ;;
+    run-compose)
+        compose-start
+        ;;
     lint)
         echo "Running Ruff Linter & Formatter..."
         uvx ruff check ../. --fix
