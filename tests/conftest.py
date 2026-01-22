@@ -75,8 +75,26 @@ def mock_external_services():
         )
 
         # LLM Gateway: Narrative
-        respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative").mock(
-            return_value=Response(200, json={"narrative": "Mock Narrative Result"})
+        respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/chat/completions").mock(
+            return_value=Response(
+                200,
+                json={
+                    "id": "chatcmpl-mock",
+                    "object": "chat.completion",
+                    "created": 1234567890,
+                    "model": "gpt-4",
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": "Mock Narrative Result",
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
+                },
+            )
         )
 
         # LLM Gateway: NPC Action

@@ -2,6 +2,7 @@ import functools
 import json
 import logging
 
+from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import END, StateGraph
 
 from gm.db.database import db
@@ -13,6 +14,7 @@ from gm.services.external import (
     ScenarioManagerClient,
     StateManagerClient,
 )
+from gm.services.llm_adapter import NarrativeChatModel
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -52,6 +54,7 @@ rule_client = RuleManagerClient()
 scenario_client = ScenarioManagerClient()
 state_client = StateManagerClient()
 llm_client = LLMGatewayClient()
+narrative_model = NarrativeChatModel()
 
 
 # --- Node Functions ---
@@ -157,14 +160,31 @@ async def generate_narrative(state: TurnContext) -> TurnContext:
     max_retries = 3
     required_slot = state["scenario_suggestion"].narrative_slot
 
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                (
+                    "You are a Game Master narrator. "
+                    "Describe the outcome of the player's action "
+                    "based on the provided rules and results."
+                ),
+            ),
+            ("user", "Input: {input_text}\nOutcome: {outcome}"),
+        ]
+    )
+
+    chain = prompt | narrative_model
+
     narrative = ""
     for _ in range(max_retries):
-        narrative = await llm_client.generate_narrative(
-            state["turn_id"],
-            state["commit_id"],
-            state["user_input"],
-            state["rule_outcome"],
+        response_msg = await chain.ainvoke(
+            {
+                "input_text": state["user_input"],
+                "outcome": state["rule_outcome"].model_dump(),
+            }
         )
+        narrative = response_msg.content
 
         if required_slot and required_slot not in narrative:
             logger.warning(f"Narrative missing slot '{required_slot}'. Retrying...")

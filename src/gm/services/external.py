@@ -9,6 +9,10 @@ from tenacity import (
 )
 
 from gm.core.config import settings
+from gm.schemas.llm import (
+    NPCActionRequest,
+    NPCActionResponse,
+)
 from gm.schemas.rule import RuleOutcome
 from gm.schemas.scenario import ScenarioSuggestion
 from gm.schemas.state import EntityDiff
@@ -68,30 +72,15 @@ class StateManagerClient:
 
 class LLMGatewayClient:
     @retry_policy
-    async def generate_narrative(
-        self, turn_id: str, commit_id: str, input_text: str, outcome: RuleOutcome
-    ) -> str:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative",
-                json={
-                    "turn_id": turn_id,
-                    "commit_id": commit_id,
-                    "input_text": input_text,
-                    "rule_outcome": outcome.model_dump(),
-                },
-            )
-            response.raise_for_status()
-            return response.json()["narrative"]
-
-    @retry_policy
     async def generate_npc_action(
         self, session_id: str, context: Dict[str, Any]
     ) -> str:
+        request_body = NPCActionRequest(session_id=session_id, context=context)
+
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{settings.LLM_GATEWAY_URL}/api/v1/llm/npc-action",
-                json={"session_id": session_id, "context": context},
+                json=request_body.model_dump(),
             )
             response.raise_for_status()
-            return response.json()["action_text"]
+            return NPCActionResponse(**response.json()).action_text

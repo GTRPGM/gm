@@ -27,7 +27,7 @@ async def connect_and_init_db():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     asyncio.create_task(connect_and_init_db())
-    print("Server starting... Swagger UI: http://localhost:8000/docs")
+    print("Server starting... Swagger UI: http://localhost:8020/docs")
     yield
 
     try:

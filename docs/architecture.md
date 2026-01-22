@@ -58,5 +58,5 @@ graph TD
 - **Scenario Manager**: `POST /api/v1/scenario/check`
 - **State Manager**: `POST /api/v1/state/commit`
 - **LLM Gateway**:
-  - `POST /api/v1/llm/narrative`
+  - `POST /api/v1/chat/completions`
   - `POST /api/v1/llm/npc-action`
