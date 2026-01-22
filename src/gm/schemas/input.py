@@ -8,6 +8,10 @@ class UserInput(BaseModel):
     # 현재는 최소한으로 시작
 
 
+class NpcTurnInput(BaseModel):
+    session_id: str = Field(..., description="세션 ID")
+
+
 class TurnInfo(BaseModel):
     turn_id: str
     session_id: str
