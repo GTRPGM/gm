@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     SCENARIO_SERVICE_URL: str = "http://localhost:8040"
     RULE_SERVICE_URL: str = "http://localhost:8050"
     LLM_GATEWAY_URL: str = "http://localhost:8060"
+    LLM_MODEL_NAME: str = "gemini-2.0-flash-lite"
 
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True)
 

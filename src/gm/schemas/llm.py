@@ -21,7 +21,7 @@ class ChatCompletionRequest(BaseModel):
     model: str = "gpt-4"
     messages: List[ChatMessage]
     temperature: float = 0.7
-    max_tokens: int = 0
+    max_tokens: Optional[int] = None
     stream: bool = False
     response_format: Optional[Dict[str, Any]] = None
     tools: Optional[List[Dict[str, Any]]] = None
