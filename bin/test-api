@@ -1,0 +1,30 @@
+#!/bin/bash
+set -e
+
+# Default URL
+BASE_URL=${1:-"http://localhost:8020"}
+
+echo "🔹 Target URL: $BASE_URL"
+
+# 1. Health Check
+echo "Checking Health..."
+curl -s -f "$BASE_URL/health" || { echo "Service is not reachable."; exit 1; }
+echo -e "\n✅ Service is Healthy."
+
+# 2. API Test
+echo -e "\n🚀 Sending Player Turn Request..."
+RESPONSE=$(curl -s -X POST "$BASE_URL/api/v1/game/turn" \
+     -H "Content-Type: application/json" \
+     -d '{"session_id": "bin_test_session", "content": "I analyze the ancient artifact."}'
+)
+
+echo "Response Received:"
+echo "$RESPONSE"
+
+# 3. Simple Validation
+if echo "$RESPONSE" | grep -q '"turn_id"' && echo "$RESPONSE" | grep -q '"narrative"'; then
+    echo -e "\nAPI Test PASSED"
+else
+    echo -e "\nAPI Test FAILED: Invalid response format"
+    exit 1
+fi
