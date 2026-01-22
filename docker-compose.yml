@@ -2,27 +2,41 @@ services:
   gm-core:
     build: .
     ports:
-      - "8000:8000"
+      - "8020:8020"
     environment:
       - POSTGRES_SERVER=postgres-db
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=gm_db
-      # Mock Services Configuration
       - STATE_SERVICE_URL=http://mock-services:8000
       - SCENARIO_SERVICE_URL=http://mock-services:8000
       - RULE_SERVICE_URL=http://mock-services:8000
-      - LLM_GATEWAY_URL=http://mock-services:8000
+      - LLM_GATEWAY_URL=http://host.docker.internal:8060
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
-      - postgres-db
-      - mock-services
+      postgres-db:
+        condition: service_healthy
+      mock-services:
+        condition: service_healthy
     networks:
       - gm-network
 
   mock-services:
     build: ./mock_services
     ports:
-      - "8001:8000"  # Expose mock service on host 8001 for debugging
+      - "8001:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 5
     networks:
       - gm-network
 
@@ -34,6 +48,11 @@ services:
       - POSTGRES_DB=gm_db
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
