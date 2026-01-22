@@ -5,6 +5,25 @@ from gm.core.config import settings
 from gm.services.graph import turn_pipeline
 
 
+def create_chat_completion_response(content: str) -> dict:
+    return {
+        "id": "chatcmpl-mock",
+        "object": "chat.completion",
+        "created": 1234567890,
+        "model": "gpt-4",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": content,
+                },
+                "finish_reason": "stop",
+            }
+        ],
+    }
+
+
 @pytest.mark.asyncio
 async def test_conflict_resolution_scenario_wins(mock_external_services):
     """
@@ -58,7 +77,11 @@ async def test_conflict_resolution_scenario_wins(mock_external_services):
     # LLM: Standard
     mock_external_services.post(
         f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative"
-    ).mock(return_value=Response(200, json={"narrative": "Conflict resolved."}))
+    ).mock(
+        return_value=Response(
+            200, json=create_chat_completion_response("Conflict resolved.")
+        )
+    )
 
     # 3. Execute Pipeline
     initial_state = {
@@ -127,8 +150,12 @@ async def test_narrative_retry_logic(mock_external_services):
         f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative"
     )
     llm_route.side_effect = [
-        Response(200, json={"narrative": "Just a normal story."}),  # Missing slot
-        Response(200, json={"narrative": "You found the SECRET_KEY!"}),  # Has slot
+        Response(
+            200, json=create_chat_completion_response("Just a normal story.")
+        ),  # Missing slot
+        Response(
+            200, json=create_chat_completion_response("You found the SECRET_KEY!")
+        ),  # Has slot
     ]
 
     # Execute
@@ -187,7 +214,11 @@ async def test_pipeline_halts_on_state_error(mock_external_services):
     # LLM should NOT be called
     llm_route = mock_external_services.post(
         f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative"
-    ).mock(return_value=Response(200, json={"narrative": "Should not see this"}))
+    ).mock(
+        return_value=Response(
+            200, json=create_chat_completion_response("Should not see this")
+        )
+    )
 
     # Execute
     initial_state = {
@@ -256,7 +287,11 @@ async def test_npc_turn_workflow(mock_external_services):
     # Narrative Generation
     mock_external_services.post(
         f"{settings.LLM_GATEWAY_URL}/api/v1/llm/narrative"
-    ).mock(return_value=Response(200, json={"narrative": "The NPC attacks!"}))
+    ).mock(
+        return_value=Response(
+            200, json=create_chat_completion_response("The NPC attacks!")
+        )
+    )
 
     # Execute
     initial_state = {
