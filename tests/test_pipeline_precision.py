@@ -88,6 +88,12 @@ async def test_conflict_resolution_scenario_wins(mock_external_services):
         "session_id": "sess_conflict",
         "user_input": "Attack",
         "is_npc_turn": False,
+        "active_entity_id": "player",
+        "act_id": "act_1",
+        "sequence_id": "seq_1",
+        "sequence_type": "COMBAT",
+        "sequence_seq": 1,
+        "world_snapshot": {"entities": ["player", "goblin"]},
     }
     final_state = await turn_pipeline.ainvoke(initial_state)
 
@@ -163,6 +169,12 @@ async def test_narrative_retry_logic(mock_external_services):
         "session_id": "sess_retry",
         "user_input": "Look around",
         "is_npc_turn": False,
+        "active_entity_id": "player",
+        "act_id": "act_1",
+        "sequence_id": "seq_1",
+        "sequence_type": "EXPLORATION",
+        "sequence_seq": 1,
+        "world_snapshot": {"entities": ["player", "chest"]},
     }
     final_state = await turn_pipeline.ainvoke(initial_state)
 
@@ -225,6 +237,12 @@ async def test_pipeline_halts_on_state_error(mock_external_services):
         "session_id": "sess_error",
         "user_input": "Save game",
         "is_npc_turn": False,
+        "active_entity_id": "player",
+        "act_id": "act_1",
+        "sequence_id": "seq_1",
+        "sequence_type": "MENU",
+        "sequence_seq": 1,
+        "world_snapshot": {"entities": ["player"]},
     }
 
     # Expect exception
@@ -243,7 +261,7 @@ async def test_npc_turn_workflow(mock_external_services):
     """
     mock_external_services.routes.clear()
 
-    # NPC Action Generation
+    # NPC Action Generation (Specific API)
     mock_external_services.post(
         f"{settings.LLM_GATEWAY_URL}/api/v1/llm/npc-action"
     ).mock(
@@ -284,23 +302,32 @@ async def test_npc_turn_workflow(mock_external_services):
         f"{settings.STATE_SERVICE_URL}/api/v1/state/commit"
     ).mock(return_value=Response(200, json={"commit_id": "commit_npc_test"}))
 
-    # Narrative Generation
-    mock_external_services.post(
+    # Narrative Generation AND Actor Selection
+    # Called twice: 1. Actor Selection, 2. Narrative Generation
+    llm_chat_route = mock_external_services.post(
         f"{settings.LLM_GATEWAY_URL}/api/v1/chat/completions"
-    ).mock(
-        return_value=Response(
-            200, json=create_chat_completion_response("The NPC attacks!")
-        )
     )
+    llm_chat_route.side_effect = [
+        Response(200, json=create_chat_completion_response("npc_1")),
+        Response(200, json=create_chat_completion_response("The NPC attacks!")),
+    ]
 
     # Execute
     initial_state = {
         "session_id": "sess_npc",
         "user_input": "",  # Empty initially
         "is_npc_turn": True,
+        "active_entity_id": "",  # Pending selection
+        "act_id": "act_1",
+        "sequence_id": "seq_1",
+        "sequence_type": "COMBAT",
+        "sequence_seq": 1,
+        "world_snapshot": {"entities": ["player", "npc_1"]},
     }
     final_state = await turn_pipeline.ainvoke(initial_state)
 
     # Verify
+    assert final_state["active_entity_id"] == "npc_1"
     assert final_state["user_input"] == "NPC attacks aggressively!"
     assert final_state["narrative"] == "The NPC attacks!"
+    assert llm_chat_route.call_count == 2
