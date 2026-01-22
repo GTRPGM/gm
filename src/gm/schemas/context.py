@@ -1,4 +1,4 @@
-from typing import List, Optional, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict
 
 from gm.schemas.rule import RuleOutcome
 from gm.schemas.scenario import ScenarioSuggestion
@@ -16,6 +16,14 @@ class TurnContext(TypedDict):
     user_input: str
     is_npc_turn: bool
 
+    # --- Hierarchy Context ---
+    act_id: Optional[str]
+    sequence_id: Optional[str]
+    sequence_type: Optional[str]  # e.g. 'COMBAT', 'EXPLORATION'
+    sequence_seq: Optional[int]  # N-th sequence in Act
+
+    active_entity_id: str  # 'player' or NPC ID
+
     # --- Processing Data ---
     turn_seq: Optional[int]
     turn_id: Optional[str]
@@ -25,6 +33,9 @@ class TurnContext(TypedDict):
 
     final_diffs: List[EntityDiff]
     commit_id: Optional[str]
+
+    # --- World State ---
+    world_snapshot: Optional[Dict[str, Any]]  # e.g. {"entities": [...]}
 
     # --- Output ---
     narrative: Optional[str]

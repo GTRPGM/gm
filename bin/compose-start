@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SERVICE_URL="http://localhost:8020"
+MOCK_URL="http://localhost:8001"
+LLM_GATEWAY_URL="${LLM_GATEWAY_URL:-http://host.docker.internal:8060}"
+
+require() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "Missing dependency: $1" >&2
+    exit 1
+  }
+}
+
+wait_for() {
+  local url="$1"
+  local retries=30
+  local delay=1
+
+  for ((i=1; i<=retries; i++)); do
+    if curl -fs "$url/health" | grep -q '"status":"ok"'; then
+      return 0
+    fi
+    sleep "$delay"
+  done
+
+  echo "Service not ready: $url" >&2
+  exit 1
+}
+
+require docker
+require curl
+require awk
+require hostname
+
+if [[ "$LLM_GATEWAY_URL" == *host.docker.internal* ]]; then
+  HOST_IP=$(hostname -I | awk '{print $1}')
+  if [[ -n "$HOST_IP" ]]; then
+    export LLM_GATEWAY_URL="${LLM_GATEWAY_URL/host.docker.internal/$HOST_IP}"
+  else
+    echo "Failed to detect host IP" >&2
+    exit 1
+  fi
+fi
+
+export LLM_GATEWAY_URL
+
+docker compose up -d --build
+
+wait_for "$MOCK_URL"
+wait_for "$SERVICE_URL"
+
+echo "Ready: $SERVICE_URL"

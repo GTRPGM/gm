@@ -9,10 +9,6 @@ from tenacity import (
 )
 
 from gm.core.config import settings
-from gm.schemas.llm import (
-    NPCActionRequest,
-    NPCActionResponse,
-)
 from gm.schemas.rule import RuleOutcome
 from gm.schemas.scenario import ScenarioSuggestion
 from gm.schemas.state import EntityDiff
@@ -29,13 +25,19 @@ retry_policy = retry(
 class RuleManagerClient:
     @retry_policy
     async def get_proposal(self, content: str) -> RuleOutcome:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{settings.RULE_SERVICE_URL}/api/v1/rule/check",
-                json={"input_text": content, "context": {}},
-            )
-            response.raise_for_status()
-            return RuleOutcome(**response.json())
+        url = f"{settings.RULE_SERVICE_URL}/api/v1/rule/check"
+        print(f"DEBUG: Requesting Rule Check at {url}")
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url,
+                    json={"input_text": content, "context": {}},
+                )
+                response.raise_for_status()
+                return RuleOutcome(**response.json())
+        except Exception as e:
+            print(f"DEBUG: Rule Check Failed: {e}")
+            raise e
 
 
 class ScenarioManagerClient:
@@ -70,17 +72,4 @@ class StateManagerClient:
             return response.json()
 
 
-class LLMGatewayClient:
-    @retry_policy
-    async def generate_npc_action(
-        self, session_id: str, context: Dict[str, Any]
-    ) -> str:
-        request_body = NPCActionRequest(session_id=session_id, context=context)
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{settings.LLM_GATEWAY_URL}/api/v1/llm/npc-action",
-                json=request_body.model_dump(),
-            )
-            response.raise_for_status()
-            return NPCActionResponse(**response.json()).action_text
+# NarrativeChatModel handles all LLM interactions via LangChain adapter.
