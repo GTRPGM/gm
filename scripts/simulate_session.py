@@ -4,7 +4,7 @@ import json
 import httpx
 
 BASE_URL = "http://localhost:8020"
-SESSION_ID = "debug_session_v2"
+SESSION_ID = "debug_session_v3"
 
 
 async def run_simulation():

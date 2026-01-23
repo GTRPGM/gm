@@ -1,7 +1,5 @@
 import pytest
 
-from gm.services.gm_service import gm_service
-
 
 @pytest.mark.asyncio
 async def test_process_turn_success(client):
@@ -18,9 +16,13 @@ async def test_process_turn_success(client):
 
 
 @pytest.mark.asyncio
-async def test_process_npc_turn():
+async def test_process_npc_turn(client):
     session_id = "npc_test_session"
-    result = await gm_service.process_npc_turn(session_id)
+    payload = {"session_id": session_id}
+    response = await client.post("/api/v1/game/npc-turn", json=payload)
+
+    assert response.status_code == 200
+    result = response.json()
 
     assert "turn_id" in result
     assert "narrative" in result

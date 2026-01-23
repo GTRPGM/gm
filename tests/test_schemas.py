@@ -1,9 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
-from gm.schemas.rule import RuleOutcome
-from gm.schemas.scenario import ScenarioConstraintType, ScenarioSuggestion
-from gm.schemas.state import EntityDiff, StateCommitRequest
+from gm.core.models.rule import RuleOutcome
+from gm.core.models.scenario import ScenarioConstraintType, ScenarioSuggestion
+from gm.core.models.state import EntityDiff, StateCommitRequest
 
 
 def test_rule_outcome_validation():
