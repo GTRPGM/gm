@@ -21,8 +21,7 @@ async def check_system_status(
     - LLM Gateway
     """
 
-    # Cast ports to actual implementation classes to access check_health
-    # Ideally, check_health should be part of the interface, but for now we cast.
+    # Access clients via the engine
     rule_client = engine.rule_client
     scenario_client = engine.scenario_client
     state_client = engine.state_client
@@ -37,11 +36,11 @@ async def check_system_status(
 
     # Parallel execution
     async def check_service(name: str, client: Any):
-        if hasattr(client, "check_health"):
+        try:
             is_healthy = await client.check_health()
             results[name] = "ok" if is_healthy else "error"
-        else:
-            results[name] = "n/a (no health check)"
+        except Exception as e:
+            results[name] = f"error: {str(e)}"
 
     await asyncio.gather(
         check_service("rule_manager", rule_client),
