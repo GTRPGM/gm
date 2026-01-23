@@ -125,7 +125,7 @@ jobs:
           username: ${{ secrets.GCP_USERNAME }}
           key: ${{ secrets.GCP_SSH_KEY }}
           source: docker-compose.yml
-          target: /opt/services/llm-gateway/
+          target: /opt/${{ env.IMAGE_NAME }}
 
       - name: Deploy Image to GCP
         uses: appleboy/ssh-action@master
@@ -135,7 +135,7 @@ jobs:
           key: ${{ secrets.GCP_SSH_KEY }}
           port: 22
           script: |
-            cd /opt/services/llm-gateway
+            cd /opt/${{ env.IMAGE_NAME }}
 
             export REGISTRY=${{ env.REGISTRY }}
             export IMAGE_NAME=${{ env.IMAGE_NAME }}
@@ -145,10 +145,10 @@ jobs:
             export POSTGRES_USER=${{ secrets.POSTGRES_USER }}
             export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
             export POSTGRES_DB=${{ secrets.POSTGRES_DB }}
-            export STATE_SERVICE_URL={{ vars.STATE_SERVICE_URL }}
-            export SCENARIO_SERVICE_URL={{ vars.SCENARIO_SERVICE_URL }}
-            export RULE_SERVICE_URL={{ vars.RULE_SERVICE_URL }}
-            export LLM_GATEWAY_URL={{ vars.LLM_GATEWAY_URL }}
+            export STATE_SERVICE_URL=${{ vars.STATE_SERVICE_URL }}
+            export SCENARIO_SERVICE_URL=${{ vars.SCENARIO_SERVICE_URL }}
+            export RULE_SERVICE_URL=${{ vars.RULE_SERVICE_URL }}
+            export LLM_GATEWAY_URL=${{ vars.LLM_GATEWAY_URL }}
 
             docker compose pull
             docker compose up -d
