@@ -1,5 +1,6 @@
 services:
   gm-core:
+    container_name: gm-core
     build: .
     ports:
       - "8020:8020"
@@ -23,6 +24,7 @@ services:
       - gm-network
 
   mock-services:
+    container_name: mock-services
     build: ./mock_services
     ports:
       - "8001:8000"
@@ -41,6 +43,7 @@ services:
       - gm-network
 
   postgres-db:
+    container_name: postgres-db
     image: postgres:15-alpine
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
@@ -60,6 +63,7 @@ services:
 
 networks:
   gm-network:
+    name: gm-network
     driver: bridge
 
 volumes:
