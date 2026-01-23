@@ -1,4 +1,4 @@
-name: CI-Dev
+name: CI
 
 on:
   pull_request:
@@ -19,14 +19,14 @@ jobs:
           enable-cache: true
 
       - name: Set up Python
-        run: uv python install 3.11
+        run: |
+          uv python install 3.11
+          uv sync --dev --frozen
 
       - name: Run pre-commit
         run: uvx pre-commit run --all-files
 
       - name: Run Unit Tests
-        run: |
-          uv sync --dev --frozen
-          uv run pytest || [ $? -eq 5 ]
+        run: uv run pytest || [ $? -eq 5 ]
         env:
           PYTHONPATH: src

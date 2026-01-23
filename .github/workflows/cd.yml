@@ -1,0 +1,154 @@
+name: CD
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ${{ vars.REGISTRY }}
+  IMAGE_NAME: ${{ vars.IMAGE_NAME }}
+  PORT: ${{ vars.PORT }}
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.11
+
+      - run: uvx pre-commit run --all-files
+
+      - run: |
+          uv sync --dev --frozen
+          uv run pytest
+        env:
+          PYTHONPATH: src
+
+  build-and-push:
+    needs: quality-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    outputs:
+      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  smoke-test:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image
+        run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Run container
+        run: |
+          docker run -d \
+            --name test-container \
+            -p ${{ env.PORT }}:${{ env.PORT }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Wait for health
+        run: |
+          for i in {1..15}; do
+            curl -f http://localhost:${{ env.PORT }}/health && exit 0
+            sleep 2
+          done
+          echo "Smoke test failed"
+          docker logs test-container
+          exit 1
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f test-container || true
+
+  deploy:
+    needs: smoke-test
+    runs-on: ubuntu-latest
+    if: ${{ github.actor != 'nektos/act' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            docker-compose.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Upload docker-compose.yml
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USERNAME }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          source: docker-compose.yml
+          target: /opt/services/llm-gateway/
+
+      - name: Deploy Image to GCP
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USERNAME }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          port: 22
+          script: |
+            cd /opt/services/llm-gateway
+
+            export REGISTRY=${{ env.REGISTRY }}
+            export IMAGE_NAME=${{ env.IMAGE_NAME }}
+            export PORT=${{ env.PORT }}
+
+            export POSTGRES_SERVER=postgres-db
+            export POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            export POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+            export STATE_SERVICE_URL={{ vars.STATE_SERVICE_URL }}
+            export SCENARIO_SERVICE_URL={{ vars.SCENARIO_SERVICE_URL }}
+            export RULE_SERVICE_URL={{ vars.RULE_SERVICE_URL }}
+            export LLM_GATEWAY_URL={{ vars.LLM_GATEWAY_URL }}
+
+            docker compose pull
+            docker compose up -d
