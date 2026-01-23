@@ -1,8 +1,10 @@
 from typing import Any, List, Optional
 
 import httpx
-from langchain_core.callbacks import CallbackManagerForLLMRun
-from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.callbacks import (
+    AsyncCallbackManagerForLLMRun,
+    CallbackManagerForLLMRun,
+)
 from langchain_core.messages import (
     AIMessage,
     BaseMessage,
@@ -10,19 +12,21 @@ from langchain_core.messages import (
     SystemMessage,
 )
 from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.runnables import RunnableLambda
 from pydantic import Field
 
 from gm.core.config import settings
-from gm.schemas.llm import (
+from gm.core.models.llm import (
     ChatCompletionRequest,
     ChatCompletionResponse,
 )
-from gm.schemas.llm import (
+from gm.core.models.llm import (
     ChatMessage as SchemaChatMessage,
 )
+from gm.interfaces.llm import LLMPort
 
 
-class NarrativeChatModel(BaseChatModel):
+class NarrativeChatModel(LLMPort):
     """
     Custom LangChain ChatModel adapter for the LLM Gateway Narrative endpoint.
     """
@@ -56,8 +60,6 @@ class NarrativeChatModel(BaseChatModel):
         """
         Sync generation is not supported/recommended for this async-first service,
         but required by abstract base class.
-        We can bridge it or just raise NotImplemented
-        if we only use async.
         """
         raise NotImplementedError(
             "Sync generation not implemented. Use ainvoke/agenerate."
@@ -67,9 +69,11 @@ class NarrativeChatModel(BaseChatModel):
         self,
         messages: List[BaseMessage],
         stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> ChatResult:
+        import json
+
         schema_messages = [self._convert_message_to_schema(m) for m in messages]
 
         request_body = ChatCompletionRequest(
@@ -77,6 +81,9 @@ class NarrativeChatModel(BaseChatModel):
             messages=schema_messages,
             temperature=kwargs.get("temperature", 0.7),
             max_tokens=kwargs.get("max_tokens"),
+            response_format=kwargs.get("response_format"),
+            tools=kwargs.get("tools"),
+            tool_choice=kwargs.get("tool_choice"),
         )
 
         response = await self.client.post(
@@ -91,12 +98,74 @@ class NarrativeChatModel(BaseChatModel):
             return ChatResult(generations=[])
 
         choice = chat_response.choices[0]
-        content = choice.message.content or ""
 
-        # Convert back to LangChain format
+        # tool_calls 처리
+        msg_kwargs = {}
+        if choice.message.tool_calls:
+            msg_kwargs["tool_calls"] = [tc for tc in choice.message.tool_calls]
+
+        raw_content = choice.message.content or ""
+
+        # structured output 처리
+        parsed_content = None
+        response_format = kwargs.get("response_format")
+
+        if response_format and isinstance(raw_content, str):
+            fmt_type = response_format.get("type")
+            if fmt_type in ("json_object", "json_schema"):
+                try:
+                    parsed_content = json.loads(raw_content)
+                except json.JSONDecodeError:
+                    parsed_content = None
+
+        final_content: Any
+        if parsed_content is not None:
+            if isinstance(parsed_content, list):
+                final_content = parsed_content
+            else:
+                final_content = [parsed_content]
+
+            msg_kwargs["parsed"] = parsed_content
+        else:
+            final_content = raw_content
+
         generation = ChatGeneration(
-            message=AIMessage(content=content),
+            message=AIMessage(
+                content=final_content,
+                additional_kwargs=msg_kwargs,  # 항상 dict
+            ),
             generation_info={"finish_reason": choice.finish_reason},
         )
 
         return ChatResult(generations=[generation])
+
+    def with_structured_output(
+        self,
+        schema: Any,
+        *,
+        method: str = "json_schema",
+        **kwargs: Any,
+    ) -> RunnableLambda:
+        async def _call(messages: List[BaseMessage]) -> Any:
+            result = await self.ainvoke(
+                messages,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {"schema": schema.model_json_schema()},
+                },
+            )
+
+            content = result.content
+
+            # LangChain content 규격(list[str|dict]) 처리
+            if isinstance(content, list):
+                if not content:
+                    raise ValueError("Empty structured output")
+                data = content[0]
+            else:
+                data = content
+
+            # Pydantic 객체로 직접 변환
+            return schema.model_validate(data)
+
+        return RunnableLambda(_call)

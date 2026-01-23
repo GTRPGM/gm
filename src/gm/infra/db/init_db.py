@@ -1,9 +1,9 @@
 import os
 
-from gm.db.database import db
+from gm.infra.db.database import db
 
 
-async def init_db():
+async def init_db() -> None:
     schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
     with open(schema_path, "r") as f:
         schema_sql = f.read()

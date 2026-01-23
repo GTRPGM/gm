@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
-    POSTGRES_DB: str = "gm_db"
+    POSTGRES_DB: str = "gm.infra.db"
 
     # External Services
     STATE_SERVICE_URL: str = "http://localhost:8030"
