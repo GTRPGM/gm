@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, List, Optional
 
 import asyncpg
 
@@ -30,25 +30,25 @@ class Database:
         return cls._pool
 
     @classmethod
-    async def execute(cls, query: str, *args):
+    async def execute(cls, query: str, *args: Any) -> str:
         pool = cls.get_pool()
         async with pool.acquire() as connection:
             return await connection.execute(query, *args)
 
     @classmethod
-    async def fetch(cls, query: str, *args):
+    async def fetch(cls, query: str, *args: Any) -> List[asyncpg.Record]:
         pool = cls.get_pool()
         async with pool.acquire() as connection:
             return await connection.fetch(query, *args)
 
     @classmethod
-    async def fetchrow(cls, query: str, *args):
+    async def fetchrow(cls, query: str, *args: Any) -> Optional[asyncpg.Record]:
         pool = cls.get_pool()
         async with pool.acquire() as connection:
             return await connection.fetchrow(query, *args)
 
     @classmethod
-    async def fetchval(cls, query: str, *args):
+    async def fetchval(cls, query: str, *args: Any) -> Any:
         pool = cls.get_pool()
         async with pool.acquire() as connection:
             return await connection.fetchval(query, *args)

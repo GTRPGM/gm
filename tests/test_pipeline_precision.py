@@ -2,7 +2,24 @@ import pytest
 from httpx import HTTPStatusError, Response
 
 from gm.core.config import settings
-from gm.services.graph import turn_pipeline
+from gm.core.engine.game_engine import GameEngine
+from gm.infra.db.database import db
+from gm.plugins.external.http_client import (
+    RuleManagerHTTPClient,
+    ScenarioManagerHTTPClient,
+    StateManagerHTTPClient,
+)
+from gm.plugins.llm.adapter import NarrativeChatModel
+
+
+def get_test_engine():
+    return GameEngine(
+        rule_client=RuleManagerHTTPClient(),
+        scenario_client=ScenarioManagerHTTPClient(),
+        state_client=StateManagerHTTPClient(),
+        llm=NarrativeChatModel(),
+        db=db,
+    )
 
 
 def create_chat_completion_response(content: str) -> dict:
@@ -95,7 +112,9 @@ async def test_conflict_resolution_scenario_wins(mock_external_services):
         "sequence_seq": 1,
         "world_snapshot": {"entities": ["player", "goblin"]},
     }
-    final_state = await turn_pipeline.ainvoke(initial_state)
+
+    engine = get_test_engine()
+    final_state = await engine.graph.ainvoke(initial_state)
 
     # 4. Verify
     # Extract final diffs
@@ -176,7 +195,9 @@ async def test_narrative_retry_logic(mock_external_services):
         "sequence_seq": 1,
         "world_snapshot": {"entities": ["player", "chest"]},
     }
-    final_state = await turn_pipeline.ainvoke(initial_state)
+
+    engine = get_test_engine()
+    final_state = await engine.graph.ainvoke(initial_state)
 
     # Verify
     assert "SECRET_KEY" in final_state["narrative"]
@@ -246,8 +267,9 @@ async def test_pipeline_halts_on_state_error(mock_external_services):
     }
 
     # Expect exception
+    engine = get_test_engine()
     with pytest.raises(HTTPStatusError):
-        await turn_pipeline.ainvoke(initial_state)
+        await engine.graph.ainvoke(initial_state)
 
     # Verify LLM was not called
     assert llm_route.call_count == 0
@@ -260,13 +282,6 @@ async def test_npc_turn_workflow(mock_external_services):
     Verifies that the NPC turn logic generates input and proceeds through the pipeline.
     """
     mock_external_services.routes.clear()
-
-    # NPC Action Generation (Specific API)
-    mock_external_services.post(
-        f"{settings.LLM_GATEWAY_URL}/api/v1/llm/npc-action"
-    ).mock(
-        return_value=Response(200, json={"action_text": "NPC attacks aggressively!"})
-    )
 
     # Rule Check
     mock_external_services.post(f"{settings.RULE_SERVICE_URL}/api/v1/rule/check").mock(
@@ -302,8 +317,6 @@ async def test_npc_turn_workflow(mock_external_services):
         f"{settings.STATE_SERVICE_URL}/api/v1/state/commit"
     ).mock(return_value=Response(200, json={"commit_id": "commit_npc_test"}))
 
-    # Narrative Generation AND Actor Selection
-    # Called twice: 1. Actor Selection, 2. Narrative Generation
     llm_chat_route = mock_external_services.post(
         f"{settings.LLM_GATEWAY_URL}/api/v1/chat/completions"
     )
@@ -311,7 +324,7 @@ async def test_npc_turn_workflow(mock_external_services):
         Response(200, json=create_chat_completion_response("npc_1")),  # Select Actor
         Response(
             200, json=create_chat_completion_response("The NPC attacks!")
-        ),  # Generate NPC Action
+        ),  # Generate NPC Action (via chat completion now)
         Response(
             200,
             json=create_chat_completion_response(
@@ -332,7 +345,9 @@ async def test_npc_turn_workflow(mock_external_services):
         "sequence_seq": 1,
         "world_snapshot": {"entities": ["player", "npc_1"]},
     }
-    final_state = await turn_pipeline.ainvoke(initial_state)
+
+    engine = get_test_engine()
+    final_state = await engine.graph.ainvoke(initial_state)
 
     # Verify
     assert final_state["active_entity_id"] == "npc_1"

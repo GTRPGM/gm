@@ -9,9 +9,14 @@ from tenacity import (
 )
 
 from gm.core.config import settings
-from gm.schemas.rule import RuleOutcome
-from gm.schemas.scenario import ScenarioSuggestion
-from gm.schemas.state import EntityDiff
+from gm.core.models.rule import RuleOutcome
+from gm.core.models.scenario import ScenarioSuggestion
+from gm.core.models.state import EntityDiff
+from gm.interfaces.external import (
+    RuleManagerPort,
+    ScenarioManagerPort,
+    StateManagerPort,
+)
 
 # 기본 재시도 설정: 예외 발생 시 최대 3회 시도, 지수 백오프 적용 (최소 0.1초, 최대 2초)
 retry_policy = retry(
@@ -22,7 +27,7 @@ retry_policy = retry(
 )
 
 
-class RuleManagerClient:
+class RuleManagerHTTPClient(RuleManagerPort):
     @retry_policy
     async def get_proposal(self, content: str) -> RuleOutcome:
         url = f"{settings.RULE_SERVICE_URL}/api/v1/rule/check"
@@ -40,7 +45,7 @@ class RuleManagerClient:
             raise e
 
 
-class ScenarioManagerClient:
+class ScenarioManagerHTTPClient(ScenarioManagerPort):
     @retry_policy
     async def get_proposal(
         self, content: str, rule_outcome: RuleOutcome
@@ -57,7 +62,7 @@ class ScenarioManagerClient:
             return ScenarioSuggestion(**response.json())
 
 
-class StateManagerClient:
+class StateManagerHTTPClient(StateManagerPort):
     @retry_policy
     async def commit(self, turn_id: str, diffs: list[EntityDiff]) -> Dict[str, Any]:
         async with httpx.AsyncClient() as client:
@@ -70,6 +75,3 @@ class StateManagerClient:
             )
             response.raise_for_status()
             return response.json()
-
-
-# NarrativeChatModel handles all LLM interactions via LangChain adapter.

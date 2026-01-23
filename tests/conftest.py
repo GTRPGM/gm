@@ -26,12 +26,12 @@ def mock_database(monkeypatch):
     mock_fetch = AsyncMock(return_value=[])
     mock_fetchrow = AsyncMock(return_value=None)
 
-    monkeypatch.setattr("gm.db.database.Database.connect", mock_connect)
-    monkeypatch.setattr("gm.db.database.Database.disconnect", mock_disconnect)
-    monkeypatch.setattr("gm.db.database.Database.fetchval", mock_fetchval)
-    monkeypatch.setattr("gm.db.database.Database.execute", mock_execute)
-    monkeypatch.setattr("gm.db.database.Database.fetch", mock_fetch)
-    monkeypatch.setattr("gm.db.database.Database.fetchrow", mock_fetchrow)
+    monkeypatch.setattr("gm.infra.db.database.Database.connect", mock_connect)
+    monkeypatch.setattr("gm.infra.db.database.Database.disconnect", mock_disconnect)
+    monkeypatch.setattr("gm.infra.db.database.Database.fetchval", mock_fetchval)
+    monkeypatch.setattr("gm.infra.db.database.Database.execute", mock_execute)
+    monkeypatch.setattr("gm.infra.db.database.Database.fetch", mock_fetch)
+    monkeypatch.setattr("gm.infra.db.database.Database.fetchrow", mock_fetchrow)
 
 
 @pytest.fixture(autouse=True)

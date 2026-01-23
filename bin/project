@@ -18,8 +18,8 @@ case "$COMMAND" in
         ;;
     lint)
         echo "Running Ruff Linter & Formatter..."
-        uvx ruff check ../. --fix
-        uvx ruff format ../.
+        uvx ruff check . --fix
+        uvx ruff format .
         ;;
     pre-commit)
         echo "Running Pre-commit hooks..."

@@ -1,11 +1,11 @@
 from typing import Any, Dict, List, Optional, TypedDict
 
-from gm.schemas.rule import RuleOutcome
-from gm.schemas.scenario import ScenarioSuggestion
-from gm.schemas.state import EntityDiff
+from gm.core.models.rule import RuleOutcome
+from gm.core.models.scenario import ScenarioSuggestion
+from gm.core.models.state import EntityDiff
 
 
-class TurnContext(TypedDict):
+class TurnContext(TypedDict, total=False):
     """
     LangGraph의 State로 사용될 턴 컨텍스트.
     TypedDict를 사용하여 LangGraph의 상태 관리 기능과 호환성을 높입니다.

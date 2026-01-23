@@ -1,15 +1,16 @@
 import asyncio
 from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Dict
 
 from fastapi import FastAPI
 
 from gm.api.v1.api import api_router
 from gm.core.config import settings
-from gm.db.database import db
-from gm.db.init_db import init_db
+from gm.infra.db.database import db
+from gm.infra.db.init_db import init_db
 
 
-async def connect_and_init_db():
+async def connect_and_init_db() -> None:
     """백그라운드에서 DB 연결 및 초기화를 시도합니다."""
     try:
         await asyncio.wait_for(db.connect(), timeout=3.0)
@@ -25,7 +26,7 @@ async def connect_and_init_db():
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     asyncio.create_task(connect_and_init_db())
     print("Server starting... Swagger UI: http://localhost:8020/docs")
     yield
@@ -47,12 +48,12 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")
-async def root():
+async def root() -> Dict[str, str]:
     return {"message": "GM Core Service is running"}
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> Dict[str, str]:
     try:
         await db.fetchval("SELECT 1")
         return {"status": "ok", "db": "connected"}
