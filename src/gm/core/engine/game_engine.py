@@ -162,10 +162,12 @@ class GameEngine:
         try:
             rows = await self.db.fetch(query, session_id, limit)
             for row in reversed(rows):
-                history.append({
-                    "player": row["user_input"],
-                    "narrative": row["final_output"],
-                })
+                history.append(
+                    {
+                        "player": row["user_input"],
+                        "narrative": row["final_output"],
+                    }
+                )
         except Exception as e:
             logger.error(f"Failed to fetch history: {e}")
         return history
@@ -192,32 +194,36 @@ class GameEngine:
 
         entity_list_str = ", ".join([str(e) for e in candidate_entities])
 
-        prompt = ChatPromptTemplate.from_messages([
-            (
-                "system",
+        prompt = ChatPromptTemplate.from_messages(
+            [
                 (
-                    "당신은 게임 마스터(GM)입니다. "
-                    "지금까지의 이력과 현재 활성화된 엔티티 목록을 바탕으로, "
-                    "다음에 누가 행동할지 결정하십시오. "
-                    "반드시 해당 엔티티의 ID(entity_id)만 답변하십시오."
+                    "system",
+                    (
+                        "당신은 게임 마스터(GM)입니다. "
+                        "지금까지의 이력과 현재 활성화된 엔티티 목록을 바탕으로, "
+                        "다음에 누가 행동할지 결정하십시오. "
+                        "반드시 해당 엔티티의 ID(entity_id)만 답변하십시오."
+                    ),
                 ),
-            ),
-            (
-                "user",
                 (
-                    f"활성 엔티티 목록: {entity_list_str}\n\n"
-                    f"최근 이력:\n{history}\n\n다음에 행동할 주체는 누구입니까?"
+                    "user",
+                    (
+                        f"활성 엔티티 목록: {entity_list_str}\n\n"
+                        f"최근 이력:\n{history}\n\n다음에 행동할 주체는 누구입니까?"
+                    ),
                 ),
-            ),
-        ])
+            ]
+        )
 
         chain = prompt | self.llm
 
         try:
-            response_msg = await chain.ainvoke({
-                "entity_list": entity_list_str,
-                "history": history,
-            })
+            response_msg = await chain.ainvoke(
+                {
+                    "entity_list": entity_list_str,
+                    "history": history,
+                }
+            )
             selected_entity = response_msg.content.strip()
             logger.info(f"   -> Selected Actor: {selected_entity}")
             return {"active_entity_id": selected_entity}
@@ -238,22 +244,24 @@ class GameEngine:
         history = await self._fetch_history(state["session_id"])
         actor = state.get("active_entity_id", "npc")
 
-        prompt = ChatPromptTemplate.from_messages([
-            (
-                "system",
+        prompt = ChatPromptTemplate.from_messages(
+            [
                 (
-                    f"당신은 TRPG 세션에서 '{actor}' 역할을 맡고 있습니다. "
-                    "상황에 몰입하여 자연스럽게 행동하십시오."
+                    "system",
+                    (
+                        f"당신은 TRPG 세션에서 '{actor}' 역할을 맡고 있습니다. "
+                        "상황에 몰입하여 자연스럽게 행동하십시오."
+                    ),
                 ),
-            ),
-            (
-                "user",
                 (
-                    f"최근 이력:\n{history}\n\n"
-                    f"당신('{actor}')의 다음 행동을 짧고 간결하게 서술하십시오."
+                    "user",
+                    (
+                        f"최근 이력:\n{history}\n\n"
+                        f"당신('{actor}')의 다음 행동을 짧고 간결하게 서술하십시오."
+                    ),
                 ),
-            ),
-        ])
+            ]
+        )
 
         chain = prompt | self.llm
 
@@ -390,19 +398,23 @@ class GameEngine:
                 "성공/실패 여부와 그로 인한 즉각적인 변화에 집중하여 짧게 요약하십시오."
             )
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_instruction),
-            ("user", "입력: {input_text}\n판정 결과: {outcome}"),
-        ])
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_instruction),
+                ("user", "입력: {input_text}\n판정 결과: {outcome}"),
+            ]
+        )
 
         chain = prompt | self.llm
 
         narrative = ""
         for _ in range(max_retries):
-            response_msg = await chain.ainvoke({
-                "input_text": state["user_input"],
-                "outcome": rule_outcome.model_dump(),
-            })
+            response_msg = await chain.ainvoke(
+                {
+                    "input_text": state["user_input"],
+                    "outcome": rule_outcome.model_dump(),
+                }
+            )
             narrative = response_msg.content
 
             if required_slot and required_slot not in narrative:

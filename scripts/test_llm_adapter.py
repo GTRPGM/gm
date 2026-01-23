@@ -19,7 +19,7 @@ async def main():
     async with httpx.AsyncClient(base_url=url, timeout=60.0) as client:
         model = NarrativeChatModel(base_url=url, client=client)
 
-        prompt = 'NPC의 다음 행동을 출력해줘.'
+        prompt = "NPC의 다음 행동을 출력해줘."
         messages = [HumanMessage(content=prompt)]
 
         # --- Test 1: basic invoke ---
