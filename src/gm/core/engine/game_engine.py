@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, TypeVar, cast
 
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import END, StateGraph
-from langgraph.graph.graph import CompiledGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from gm.core.models.context import TurnContext
 from gm.core.models.state import EntityDiff
@@ -63,7 +63,7 @@ class GameEngine:
         self.state_client = state_client
         self.llm = llm
         self.db = db
-        self.graph: CompiledGraph = self._build_graph()
+        self.graph: CompiledStateGraph = self._build_graph()
 
     async def get_session_history(self, session_id: str) -> List[Dict[str, Any]]:
         query = """
@@ -147,7 +147,9 @@ class GameEngine:
             "is_npc_turn": True,
         }
 
-    async def _fetch_history(self, session_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+    async def _fetch_history(
+        self, session_id: str, limit: int = 5
+    ) -> List[Dict[str, Any]]:
         """Helper to fetch recent history."""
         query = """
             SELECT user_input, final_output
@@ -160,12 +162,10 @@ class GameEngine:
         try:
             rows = await self.db.fetch(query, session_id, limit)
             for row in reversed(rows):
-                history.append(
-                    {
-                        "player": row["user_input"],
-                        "narrative": row["final_output"],
-                    }
-                )
+                history.append({
+                    "player": row["user_input"],
+                    "narrative": row["final_output"],
+                })
         except Exception as e:
             logger.error(f"Failed to fetch history: {e}")
         return history
@@ -192,36 +192,32 @@ class GameEngine:
 
         entity_list_str = ", ".join([str(e) for e in candidate_entities])
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
+        prompt = ChatPromptTemplate.from_messages([
+            (
+                "system",
                 (
-                    "system",
-                    (
-                        "당신은 게임 마스터(GM)입니다. "
-                        "지금까지의 이력과 현재 활성화된 엔티티 목록을 바탕으로, "
-                        "다음에 누가 행동할지 결정하십시오. "
-                        "반드시 해당 엔티티의 ID(entity_id)만 답변하십시오."
-                    ),
+                    "당신은 게임 마스터(GM)입니다. "
+                    "지금까지의 이력과 현재 활성화된 엔티티 목록을 바탕으로, "
+                    "다음에 누가 행동할지 결정하십시오. "
+                    "반드시 해당 엔티티의 ID(entity_id)만 답변하십시오."
                 ),
+            ),
+            (
+                "user",
                 (
-                    "user",
-                    (
-                        f"활성 엔티티 목록: {entity_list_str}\n\n"
-                        f"최근 이력:\n{history}\n\n다음에 행동할 주체는 누구입니까?"
-                    ),
+                    f"활성 엔티티 목록: {entity_list_str}\n\n"
+                    f"최근 이력:\n{history}\n\n다음에 행동할 주체는 누구입니까?"
                 ),
-            ]
-        )
+            ),
+        ])
 
         chain = prompt | self.llm
 
         try:
-            response_msg = await chain.ainvoke(
-                {
-                    "entity_list": entity_list_str,
-                    "history": history,
-                }
-            )
+            response_msg = await chain.ainvoke({
+                "entity_list": entity_list_str,
+                "history": history,
+            })
             selected_entity = response_msg.content.strip()
             logger.info(f"   -> Selected Actor: {selected_entity}")
             return {"active_entity_id": selected_entity}
@@ -242,24 +238,22 @@ class GameEngine:
         history = await self._fetch_history(state["session_id"])
         actor = state.get("active_entity_id", "npc")
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
+        prompt = ChatPromptTemplate.from_messages([
+            (
+                "system",
                 (
-                    "system",
-                    (
-                        f"당신은 TRPG 세션에서 '{actor}' 역할을 맡고 있습니다. "
-                        "상황에 몰입하여 자연스럽게 행동하십시오."
-                    ),
+                    f"당신은 TRPG 세션에서 '{actor}' 역할을 맡고 있습니다. "
+                    "상황에 몰입하여 자연스럽게 행동하십시오."
                 ),
+            ),
+            (
+                "user",
                 (
-                    "user",
-                    (
-                        f"최근 이력:\n{history}\n\n"
-                        f"당신('{actor}')의 다음 행동을 짧고 간결하게 서술하십시오."
-                    ),
+                    f"최근 이력:\n{history}\n\n"
+                    f"당신('{actor}')의 다음 행동을 짧고 간결하게 서술하십시오."
                 ),
-            ]
-        )
+            ),
+        ])
 
         chain = prompt | self.llm
 
@@ -300,13 +294,8 @@ class GameEngine:
         """Call Scenario Manager."""
         rule_outcome = state.get("rule_outcome")
         if not rule_outcome:
-             logger.warning("Rule outcome is missing in check_scenario")
-             # Return empty or handle error. For now, assuming it might be skipped if null.
-             # But port expects RuleOutcome.
-             # We should probably raise error or return early if this is critical.
-             # If we return early, we might break the flow if next steps depend on scenario_suggestion.
-             # Let's raise for now to be safe or mock it.
-             raise ValueError("Rule outcome is required for scenario check")
+            logger.warning("Rule outcome is missing in check_scenario")
+            raise ValueError("Rule outcome is required for scenario check")
 
         proposal = await self.scenario_client.get_proposal(
             state["user_input"], rule_outcome
@@ -364,7 +353,7 @@ class GameEngine:
         turn_id = state.get("turn_id")
         if not turn_id:
             raise ValueError("Turn ID is missing")
-        
+
         final_diffs = state.get("final_diffs", [])
 
         result = await self.state_client.commit(turn_id, final_diffs)
@@ -376,10 +365,10 @@ class GameEngine:
         max_retries = 3
         scenario = state.get("scenario_suggestion")
         if not scenario:
-             raise ValueError("Scenario suggestion missing")
-             
+            raise ValueError("Scenario suggestion missing")
+
         required_slot = scenario.narrative_slot
-        
+
         rule_outcome = state.get("rule_outcome")
         if not rule_outcome:
             raise ValueError("Rule outcome missing")
@@ -401,23 +390,19 @@ class GameEngine:
                 "성공/실패 여부와 그로 인한 즉각적인 변화에 집중하여 짧게 요약하십시오."
             )
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_instruction),
-                ("user", "입력: {input_text}\n판정 결과: {outcome}"),
-            ]
-        )
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_instruction),
+            ("user", "입력: {input_text}\n판정 결과: {outcome}"),
+        ])
 
         chain = prompt | self.llm
 
         narrative = ""
         for _ in range(max_retries):
-            response_msg = await chain.ainvoke(
-                {
-                    "input_text": state["user_input"],
-                    "outcome": rule_outcome.model_dump(),
-                }
-            )
+            response_msg = await chain.ainvoke({
+                "input_text": state["user_input"],
+                "outcome": rule_outcome.model_dump(),
+            })
             narrative = response_msg.content
 
             if required_slot and required_slot not in narrative:
@@ -473,7 +458,7 @@ class GameEngine:
 
         return {}
 
-    def _build_graph(self) -> CompiledGraph:
+    def _build_graph(self) -> CompiledStateGraph:
         workflow = StateGraph(TurnContext)
 
         # Add Nodes (bound to self)
