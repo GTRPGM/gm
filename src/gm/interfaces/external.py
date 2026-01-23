@@ -11,6 +11,10 @@ class RuleManagerPort(ABC):
     async def get_proposal(self, content: str) -> RuleOutcome:
         pass
 
+    @abstractmethod
+    async def check_health(self) -> bool:
+        pass
+
 
 class ScenarioManagerPort(ABC):
     @abstractmethod
@@ -19,8 +23,16 @@ class ScenarioManagerPort(ABC):
     ) -> ScenarioSuggestion:
         pass
 
+    @abstractmethod
+    async def check_health(self) -> bool:
+        pass
+
 
 class StateManagerPort(ABC):
     @abstractmethod
     async def commit(self, turn_id: str, diffs: list[EntityDiff]) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    async def check_health(self) -> bool:
         pass

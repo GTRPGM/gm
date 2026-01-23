@@ -169,3 +169,14 @@ class NarrativeChatModel(LLMPort):
             return schema.model_validate(data)
 
         return RunnableLambda(_call)
+
+    async def check_health(self) -> bool:
+        """Check if LLM Gateway is reachable."""
+        # Clean up base_url if it has trailing slash
+        base = self.base_url.rstrip("/")
+        url = f"{base}/health"
+        try:
+            resp = await self.client.get(url, timeout=3.0)
+            return resp.status_code == 200
+        except Exception:
+            return False
