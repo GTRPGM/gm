@@ -37,6 +37,6 @@ USER appuser
 EXPOSE 8020
 
 HEALTHCHECK --start-period=20s --interval=30s --timeout=3s --retries=3 \
-    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:$PORT/health')"]
+    CMD ["python", "-c", "import os, urllib.request; port=os.environ.get('PORT'); urllib.request.urlopen(f'http://localhost:{port}/health')"]
 
 CMD ["sh", "-c", "uvicorn gm.main:app --host 0.0.0.0 --port $PORT"]
