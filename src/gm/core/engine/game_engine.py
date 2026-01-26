@@ -96,10 +96,7 @@ class GameEngine:
             "sequence_id": "seq_1",
             "sequence_type": "EXPLORATION",
             "sequence_seq": 1,
-            "world_snapshot": {
-                "entities": ["player", "goblin_scout", "elder_merchant", "Narrator"],
-                "environment": "Dimly lit cavern with dripping water.",
-            },
+            # world_snapshot will be loaded by fetch_state node
         }
 
         player_result_state = await self.graph.ainvoke(player_state)
@@ -130,10 +127,7 @@ class GameEngine:
             "sequence_id": "seq_1",
             "sequence_type": "COMBAT",
             "sequence_seq": 1,
-            "world_snapshot": {
-                "entities": ["player", "goblin_warrior", "goblin_shaman", "Narrator"],
-                "environment": "Heat of battle, sparks flying.",
-            },
+            # world_snapshot will be loaded by fetch_state node
         }
 
         # 그래프 비동기 실행
@@ -171,6 +165,22 @@ class GameEngine:
         except Exception as e:
             logger.error(f"Failed to fetch history: {e}")
         return history
+
+    @log_node_execution
+    async def fetch_state(self, state: TurnContext) -> TurnContext:
+        """Fetch latest world state from State Manager."""
+        try:
+            snapshot = await self.state_client.get_state(state["session_id"])
+            logger.info(
+                (
+                    "   -> Fetched State Snapshot with "
+                    f"{len(snapshot.get('entities', []))} entities"
+                )
+            )
+            return {"world_snapshot": snapshot}
+        except Exception as e:
+            logger.error(f"Failed to fetch state: {e}")
+            return {}
 
     @log_node_execution
     async def select_active_entity(self, state: TurnContext) -> TurnContext:
@@ -294,7 +304,7 @@ class GameEngine:
     @log_node_execution
     async def check_rule(self, state: TurnContext) -> TurnContext:
         """Call Rule Manager."""
-        proposal = await self.rule_client.get_proposal(state["user_input"])
+        proposal = await self.rule_client.get_proposal(state)
         return {"rule_outcome": proposal}
 
     @log_node_execution
@@ -339,14 +349,19 @@ class GameEngine:
                 resolved_diffs_map[eid] = s_data.copy()
                 continue
 
-            if rule.value_range:
-                for field, s_val in s_data.items():
-                    if field in rule.value_range:
-                        resolved_diffs_map[eid][field] = s_val
-                    else:
-                        resolved_diffs_map[eid][field] = s_val
-            else:
-                resolved_diffs_map[eid].update(s_data)
+            # Check if value_range is a dict before using it for field checks
+            # Currently the logic was redundant (same assignment),
+            # so simplifying to direct update
+            # unless we implement actual constraint clamping later.
+            is_constrained = isinstance(rule.value_range, dict)
+
+            for field, s_val in s_data.items():
+                if is_constrained and field in rule.value_range:
+                    # TODO: Implement actual clamping logic
+                    # if needed using rule.value_range[field]
+                    resolved_diffs_map[eid][field] = s_val
+                else:
+                    resolved_diffs_map[eid][field] = s_val
 
         final_diffs = [
             EntityDiff(entity_id=eid, diff=diff)
@@ -474,6 +489,7 @@ class GameEngine:
         workflow = StateGraph(TurnContext)
 
         # Add Nodes (bound to self)
+        workflow.add_node("fetch_state", self.fetch_state)
         workflow.add_node("select_active_entity", self.select_active_entity)
         workflow.add_node("generate_npc_input", self.generate_npc_input)
         workflow.add_node("init_turn", self.init_turn)
@@ -485,9 +501,10 @@ class GameEngine:
         workflow.add_node("save_log", self.save_log)
 
         # Entry
-        workflow.set_entry_point("select_active_entity")
+        workflow.set_entry_point("fetch_state")
 
         # Edges
+        workflow.add_edge("fetch_state", "select_active_entity")
         workflow.add_edge("select_active_entity", "generate_npc_input")
         workflow.add_edge("generate_npc_input", "init_turn")
         workflow.add_edge("init_turn", "check_rule")
