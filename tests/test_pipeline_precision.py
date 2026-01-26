@@ -1,5 +1,5 @@
 import pytest
-from httpx import HTTPStatusError, Response
+from httpx import Response
 
 from gm.core.config import settings
 from gm.core.engine.game_engine import GameEngine
@@ -58,11 +58,20 @@ async def test_conflict_resolution_scenario_wins(mock_external_services):
         return_value=Response(
             200,
             json={
-                "description": "Rule Check",
-                "success": True,
-                "suggested_diffs": [{"entity_id": "player", "diff": {"hp": -10}}],
-                "required_entities": [],
-                "value_range": None,
+                "status": "success",
+                "data": {
+                    "session_id": "sess_conflict",
+                    "scenario_id": 1,
+                    "phase_type": "COMBAT",
+                    "reason": "Rule Check",
+                    "success": True,
+                    "suggested": {
+                        "diffs": [{"entity_id": "player", "diff": {"hp": -10}}],
+                        "relations": [],
+                    },
+                    "value_range": None,
+                },
+                "message": "OK",
             },
         )
     )
@@ -142,11 +151,17 @@ async def test_narrative_retry_logic(mock_external_services):
         return_value=Response(
             200,
             json={
-                "description": "Rule Check",
-                "success": True,
-                "suggested_diffs": [],
-                "required_entities": [],
-                "value_range": None,
+                "status": "success",
+                "data": {
+                    "session_id": "sess_retry",
+                    "scenario_id": 1,
+                    "phase_type": "EXPLORATION",
+                    "reason": "Rule Check",
+                    "success": True,
+                    "suggested": {"diffs": [], "relations": []},
+                    "value_range": None,
+                },
+                "message": "OK",
             },
         )
     )
@@ -217,11 +232,17 @@ async def test_pipeline_halts_on_state_error(mock_external_services):
         return_value=Response(
             200,
             json={
-                "description": "Rule Check",
-                "success": True,
-                "suggested_diffs": [],
-                "required_entities": [],
-                "value_range": None,
+                "status": "success",
+                "data": {
+                    "session_id": "sess_error",
+                    "scenario_id": 1,
+                    "phase_type": "MENU",
+                    "reason": "Rule Check",
+                    "success": True,
+                    "suggested": {"diffs": [], "relations": []},
+                    "value_range": None,
+                },
+                "message": "OK",
             },
         )
     )
@@ -268,7 +289,24 @@ async def test_pipeline_halts_on_state_error(mock_external_services):
 
     # Expect exception
     engine = get_test_engine()
-    with pytest.raises(HTTPStatusError):
+
+    # Patch the state client to raise an error, overriding the hardcoded mock
+    import httpx
+
+    # Create a dummy request/response for the error
+    request = httpx.Request("POST", "http://mock/commit")
+    response = httpx.Response(500, request=request)
+    error = httpx.HTTPStatusError(
+        "500 Internal Server Error", request=request, response=response
+    )
+
+    # We need to patch the commit method to raise this error
+    # Since commit is async, we need a side_effect that raises
+    from unittest.mock import MagicMock
+
+    engine.state_client.commit = MagicMock(side_effect=error)
+
+    with pytest.raises(httpx.HTTPStatusError):
         await engine.graph.ainvoke(initial_state)
 
     # Verify LLM was not called
@@ -288,11 +326,17 @@ async def test_npc_turn_workflow(mock_external_services):
         return_value=Response(
             200,
             json={
-                "description": "NPC Rule Check",
-                "success": True,
-                "suggested_diffs": [],
-                "required_entities": [],
-                "value_range": None,
+                "status": "success",
+                "data": {
+                    "session_id": "sess_npc",
+                    "scenario_id": 1,
+                    "phase_type": "COMBAT",
+                    "reason": "NPC Rule Check",
+                    "success": True,
+                    "suggested": {"diffs": [], "relations": []},
+                    "value_range": None,
+                },
+                "message": "OK",
             },
         )
     )
