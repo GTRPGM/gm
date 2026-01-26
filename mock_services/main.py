@@ -85,7 +85,7 @@ class NpcActionRequest(BaseModel):
 # --- Endpoints ---
 
 
-@app.post("/api/v1/rule/check", response_model=RuleCheckResponse)
+@app.post("/play/scenario", response_model=RuleCheckResponse)
 async def check_rule(request: RuleCheckRequest):
     print(f"[Rule] Checking story: {request.story}")
     return RuleCheckResponse(

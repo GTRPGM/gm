@@ -34,7 +34,7 @@ retry_policy = retry(
 class RuleManagerHTTPClient(RuleManagerPort):
     @retry_policy
     async def get_proposal(self, context: Dict[str, Any]) -> RuleOutcome:
-        url = f"{settings.RULE_SERVICE_URL}/api/v1/rule/check"
+        url = f"{settings.RULE_SERVICE_URL}/play/scenario"
         print(f"DEBUG: Requesting Rule Check at {url}")
 
         # Construct payload from context
