@@ -44,6 +44,15 @@ class RuleManagerHTTPClient(RuleManagerPort):
             print(f"DEBUG: Rule Check Failed: {e}")
             raise e
 
+    async def check_health(self) -> bool:
+        url = f"{settings.RULE_SERVICE_URL}/health"
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(url)
+                return resp.status_code == 200
+        except Exception:
+            return False
+
 
 class ScenarioManagerHTTPClient(ScenarioManagerPort):
     @retry_policy
@@ -61,6 +70,15 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
             response.raise_for_status()
             return ScenarioSuggestion(**response.json())
 
+    async def check_health(self) -> bool:
+        url = f"{settings.SCENARIO_SERVICE_URL}/health"
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(url)
+                return resp.status_code == 200
+        except Exception:
+            return False
+
 
 class StateManagerHTTPClient(StateManagerPort):
     @retry_policy
@@ -75,3 +93,12 @@ class StateManagerHTTPClient(StateManagerPort):
             )
             response.raise_for_status()
             return response.json()
+
+    async def check_health(self) -> bool:
+        url = f"{settings.STATE_SERVICE_URL}/health"
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(url)
+                return resp.status_code == 200
+        except Exception:
+            return False
