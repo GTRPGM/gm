@@ -39,7 +39,7 @@ def mock_external_services(respx_mock):
     respx_mock fixture를 사용하여 외부 서비스 호출을 가로챕니다.
     """
     # Rule Manager
-    respx_mock.post(f"{settings.RULE_SERVICE_URL}/api/v1/rule/check").mock(
+    respx_mock.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
         return_value=Response(
             200,
             json={

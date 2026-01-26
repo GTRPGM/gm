@@ -28,7 +28,7 @@ async def test_rule_manager_integration(client, respx_mock):
     }
 
     # 2. 기존 룰(conftest에서 설정된 것)을 덮어씌움
-    rule_route = respx_mock.post(f"{settings.RULE_SERVICE_URL}/api/v1/rule/check").mock(
+    rule_route = respx_mock.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
         return_value=Response(200, json=mock_response)
     )
 

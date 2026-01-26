@@ -54,7 +54,7 @@ async def test_conflict_resolution_scenario_wins(mock_external_services):
     # 2. Setup Specific Mocks
 
     # Rule: Suggests damage 10
-    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/api/v1/rule/check").mock(
+    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
         return_value=Response(
             200,
             json={
@@ -147,7 +147,7 @@ async def test_narrative_retry_logic(mock_external_services):
     mock_external_services.routes.clear()
 
     # Rule & Scenario Setup
-    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/api/v1/rule/check").mock(
+    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
         return_value=Response(
             200,
             json={
@@ -228,7 +228,7 @@ async def test_pipeline_halts_on_state_error(mock_external_services):
     """
     mock_external_services.routes.clear()
 
-    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/api/v1/rule/check").mock(
+    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
         return_value=Response(
             200,
             json={
@@ -322,7 +322,7 @@ async def test_npc_turn_workflow(mock_external_services):
     mock_external_services.routes.clear()
 
     # Rule Check
-    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/api/v1/rule/check").mock(
+    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
         return_value=Response(
             200,
             json={
