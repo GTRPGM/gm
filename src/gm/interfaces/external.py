@@ -8,7 +8,7 @@ from gm.core.models.state import EntityDiff
 
 class RuleManagerPort(ABC):
     @abstractmethod
-    async def get_proposal(self, content: str) -> RuleOutcome:
+    async def get_proposal(self, context: Dict[str, Any]) -> RuleOutcome:
         pass
 
     @abstractmethod
@@ -31,6 +31,11 @@ class ScenarioManagerPort(ABC):
 class StateManagerPort(ABC):
     @abstractmethod
     async def commit(self, turn_id: str, diffs: list[EntityDiff]) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    async def get_state(self, session_id: str) -> Dict[str, Any]:
+        """Fetch current world state snapshot including entities and relations."""
         pass
 
     @abstractmethod

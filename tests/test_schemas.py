@@ -9,18 +9,34 @@ from gm.core.models.state import EntityDiff, StateCommitRequest
 def test_rule_outcome_validation():
     # 정상 케이스
     data = {
-        "description": "성공적인 공격",
+        "session_id": "test_session",
+        "scenario_id": 1,
+        "phase_type": "COMBAT",
+        "reason": "성공적인 공격",
         "success": True,
-        "suggested_diffs": [{"hp": -10}],
+        "suggested": {
+            "diffs": [{"entity_id": "player", "diff": {"hp": -10}}],
+            "relations": [],
+        },
         "value_range": {"min": 1, "max": 20},
     }
     outcome = RuleOutcome(**data)
-    assert outcome.success is True
-    assert outcome.suggested_diffs[0]["hp"] == -10
 
-    # 필수 필드 누락 (description)
+    # Check inherited fields
+    assert outcome.success is True
+    assert outcome.reason == "성공적인 공격"
+
+    # Check compatibility properties
+    assert outcome.description == "성공적인 공격"
+
+    diffs = outcome.suggested_diffs
+    assert len(diffs) == 1
+    assert diffs[0]["entity_id"] == "player"
+    assert diffs[0]["diff"]["hp"] == -10
+
+    # 필수 필드 누락 (reason)
     with pytest.raises(ValidationError):
-        RuleOutcome(success=True)
+        RuleOutcome(session_id="s1", scenario_id=1, success=True, suggested={})
 
 
 def test_scenario_suggestion_validation():

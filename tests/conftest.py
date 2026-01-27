@@ -2,7 +2,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
-import respx
 from httpx import ASGITransport, AsyncClient, Response
 
 from gm.core.config import settings
@@ -35,74 +34,82 @@ def mock_database(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def mock_external_services():
+def mock_external_services(respx_mock):
     """
-    respx를 사용하여 외부 서비스 호출을 가로챕니다.
+    respx_mock fixture를 사용하여 외부 서비스 호출을 가로챕니다.
     """
-    with respx.mock(assert_all_called=False) as respx_mock:
-        # Rule Manager
-        respx_mock.post(f"{settings.RULE_SERVICE_URL}/api/v1/rule/check").mock(
-            return_value=Response(
-                200,
-                json={
-                    "description": "Mock Rule Check",
+    # Rule Manager
+    respx_mock.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
+        return_value=Response(
+            200,
+            json={
+                "status": "success",
+                "data": {
+                    "session_id": "test_session",
+                    "scenario_id": 1,
+                    "phase_type": "탐험",
+                    "reason": "Mock Rule Check",
                     "success": True,
-                    "suggested_diffs": [{"entity_id": "dummy", "diff": {"hp": 90}}],
-                    "required_entities": [],
+                    "suggested": {
+                        "diffs": [{"entity_id": "dummy", "diff": {"hp": 90}}],
+                        "relations": [],
+                    },
                     "value_range": None,
                 },
-            )
+                "message": "OK",
+            },
         )
+    )
 
-        # Scenario Manager
-        respx_mock.post(f"{settings.SCENARIO_SERVICE_URL}/api/v1/scenario/check").mock(
-            return_value=Response(
-                200,
-                json={
-                    "constraint_type": "advisory",
-                    "description": "Mock Scenario Check",
-                    "correction_diffs": [],
-                    "narrative_slot": None,
-                },
-            )
+    # Scenario Manager
+    respx_mock.post(f"{settings.SCENARIO_SERVICE_URL}/api/v1/scenario/check").mock(
+        return_value=Response(
+            200,
+            json={
+                "constraint_type": "advisory",
+                "description": "Mock Scenario Check",
+                "correction_diffs": [],
+                "narrative_slot": None,
+            },
         )
+    )
 
-        # State Manager
-        respx_mock.post(f"{settings.STATE_SERVICE_URL}/api/v1/state/commit").mock(
-            return_value=Response(
-                200, json={"commit_id": "mock_commit_12345", "status": "success"}
-            )
+    # State Manager
+    respx_mock.post(f"{settings.STATE_SERVICE_URL}/api/v1/state/commit").mock(
+        return_value=Response(
+            200, json={"commit_id": "mock_commit_12345", "status": "success"}
         )
+    )
 
-        # LLM Gateway: Narrative
-        respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/chat/completions").mock(
-            return_value=Response(
-                200,
-                json={
-                    "id": "chatcmpl-mock",
-                    "object": "chat.completion",
-                    "created": 1234567890,
-                    "model": "gpt-4",
-                    "choices": [
-                        {
-                            "index": 0,
-                            "message": {
-                                "role": "assistant",
-                                "content": "Mock Narrative Result",
-                            },
-                            "finish_reason": "stop",
-                        }
-                    ],
-                },
-            )
+    # LLM Gateway: Narrative
+    respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/chat/completions").mock(
+        return_value=Response(
+            200,
+            json={
+                "id": "chatcmpl-mock",
+                "object": "chat.completion",
+                "created": 1234567890,
+                "model": "gpt-4",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": "Mock Narrative Result",
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+            },
         )
+    )
 
-        # LLM Gateway: NPC Action
-        respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/llm/npc-action").mock(
-            return_value=Response(200, json={"action_text": "NPC Mock Action"})
-        )
+    # LLM Gateway: NPC Action
+    respx_mock.post(f"{settings.LLM_GATEWAY_URL}/api/v1/llm/npc-action").mock(
+        return_value=Response(200, json={"action_text": "NPC Mock Action"})
+    )
 
-        yield respx_mock
+    return respx_mock
 
 
 @pytest_asyncio.fixture(scope="function")

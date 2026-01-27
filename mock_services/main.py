@@ -8,17 +8,49 @@ app = FastAPI(title="GM Mock Services")
 # --- Schemas (Simplified copies from src/gm/schemas) ---
 
 
+class RuleRequestEntity(BaseModel):
+    entity_id: Any
+    entity_name: str
+
+
+class RuleRequestRelation(BaseModel):
+    cause_entity_id: Any
+    effect_entity_id: Any
+    type: str
+
+
 class RuleCheckRequest(BaseModel):
-    input_text: str
-    context: Dict[str, Any]
+    session_id: Any
+    scenario_id: Any
+    entities: List[RuleRequestEntity]
+    relations: List[RuleRequestRelation]
+    story: str
 
 
-class RuleOutcome(BaseModel):
-    description: str
+class RulesuggestedDiff(BaseModel):
+    entity_id: Any
+    diff: Any
+
+
+class RuleSuggestion(BaseModel):
+    diffs: List[RulesuggestedDiff] = []
+    relations: List[Any] = []
+
+
+class RuleOutcomeData(BaseModel):
+    session_id: Any
+    scenario_id: Any
+    phase_type: str = "탐험"
+    reason: str
     success: bool
-    suggested_diffs: List[Dict[str, Any]] = Field(default_factory=list)
-    required_entities: List[str] = Field(default_factory=list)
-    value_range: Optional[Dict[str, float]] = None
+    suggested: RuleSuggestion
+    value_range: Optional[Any] = None
+
+
+class RuleCheckResponse(BaseModel):
+    status: str = "success"
+    data: RuleOutcomeData
+    message: str = "OK"
 
 
 class ScenarioCheckRequest(BaseModel):
@@ -53,14 +85,17 @@ class NpcActionRequest(BaseModel):
 # --- Endpoints ---
 
 
-@app.post("/api/v1/rule/check", response_model=RuleOutcome)
+@app.post("/play/scenario", response_model=RuleCheckResponse)
 async def check_rule(request: RuleCheckRequest):
-    print(f"[Rule] Checking: {request.input_text}")
-    return RuleOutcome(
-        description="Action appears feasible within standard parameters.",
-        success=True,
-        suggested_diffs=[],
-        required_entities=[],
+    print(f"[Rule] Checking story: {request.story}")
+    return RuleCheckResponse(
+        data=RuleOutcomeData(
+            session_id=request.session_id,
+            scenario_id=request.scenario_id,
+            reason="Action appears feasible within standard parameters.",
+            success=True,
+            suggested=RuleSuggestion(diffs=[]),
+        )
     )
 
 
