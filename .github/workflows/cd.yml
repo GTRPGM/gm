@@ -134,13 +134,6 @@ jobs:
 
             # Others
             export LLM_MODEL_NAME="${{ vars.LLM_MODEL_NAME }}"
-            export GEMINI_DEFAULT_MODEL="${{ vars.GEMINI_DEFAULT_MODEL }}"
-
-            # Logic Settings
-            export SCENARIO_GRAPH_NAME="${{ vars.SCENARIO_GRAPH_NAME }}"
-
-            docker compose pull
-            docker compose up -d
 
 
             docker compose pull
