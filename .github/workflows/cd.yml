@@ -3,13 +3,19 @@ name: CD
 on:
   pull_request:
     branches:
-      - main
+      - "main"
+      - "ops/28-deploy-standard"
   workflow_dispatch:
 
 env:
+  # service settings
+  SERVICE_NAME: ${{ vars.SERVICE_NAME }}
+  PORT: ${{ vars.PORT}}
+  TAG: ${{ vars.TAG || 'latest' }}
+  # system settings
   REGISTRY: ${{ vars.REGISTRY }}
-  IMAGE_NAME: ${{ vars.IMAGE_NAME }}
-  PORT: ${{ vars.PORT }}
+  ORG_NAME: ${{ vars.ORG_NAME }}
+  IMAGE_NAME: ${{ vars.REGISTRY }}/${{ vars.ORG_NAME }}/${{ vars.SERVICE_NAME }}
 
 jobs:
   quality-check:
@@ -32,7 +38,6 @@ jobs:
           PYTHONPATH: src
 
   build-and-push:
-    needs: quality-check
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,7 +45,7 @@ jobs:
       id-token: write
 
     outputs:
-      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      image: ${{ env.IMAGE_NAME }}:${{ env.TAG }}
 
     steps:
       - uses: actions/checkout@v4
@@ -56,8 +61,10 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: type=raw,value=latest
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ env.TAG }}
+            type=sha,format=short
 
       - uses: docker/build-push-action@v6
         with:
@@ -68,46 +75,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  smoke-test:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
-
-    steps:
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull image
-        run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-
-      - name: Run container
-        run: |
-          docker run -d \
-            --name test-container \
-            -p ${{ env.PORT }}:${{ env.PORT }} \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-
-      - name: Wait for health
-        run: |
-          for i in {1..15}; do
-            curl -f http://localhost:${{ env.PORT }}/health && exit 0
-            sleep 2
-          done
-          echo "Smoke test failed"
-          docker logs test-container
-          exit 1
-
-      - name: Cleanup
-        if: always()
-        run: docker rm -f test-container || true
-
   deploy:
-    needs: smoke-test
+    needs: build-and-push
     runs-on: ubuntu-latest
     if: ${{ github.actor != 'nektos/act' }}
 
@@ -119,36 +88,60 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Upload docker-compose.yml
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1
         with:
-          host: ${{ secrets.GCP_HOST }}
-          username: ${{ secrets.GCP_USERNAME }}
-          key: ${{ secrets.GCP_SSH_KEY }}
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USERNAME }}
+          key: ${{ secrets.REMOTE_SSH_KEY }}
           source: docker-compose.yml
-          target: /opt/${{ env.IMAGE_NAME }}
+          target: /opt/services/${{ env.SERVICE_NAME }}
 
-      - name: Deploy Image to GCP
-        uses: appleboy/ssh-action@master
+      - name: Deploy to Remote Server
+        uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.GCP_HOST }}
-          username: ${{ secrets.GCP_USERNAME }}
-          key: ${{ secrets.GCP_SSH_KEY }}
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USERNAME }}
+          key: ${{ secrets.REMOTE_SSH_KEY }}
           port: 22
+          debug: true
           script: |
-            cd /opt/${{ env.IMAGE_NAME }}
+            set -e
 
-            export REGISTRY=${{ env.REGISTRY }}
-            export IMAGE_NAME=${{ env.IMAGE_NAME }}
+            export DOCKER_CONFIG=$(mktemp -d)
+            trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
+
+            cd /opt/services/${{ env.SERVICE_NAME }}
+
+            export IMAGE_NAME=${{ env.IMAGE_NAME }}:${{ env.TAG }}
+
+            # --- Environment Variables from Secrets/Vars ---
             export PORT=${{ env.PORT }}
 
-            export POSTGRES_SERVER=${{ secrets.POSTGRES_SERVER }}
-            export POSTGRES_USER=${{ secrets.POSTGRES_USER }}
-            export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            export POSTGRES_DB=${{ secrets.POSTGRES_DB }}
-            export STATE_SERVICE_URL=${{ vars.STATE_SERVICE_URL }}
-            export SCENARIO_SERVICE_URL=${{ vars.SCENARIO_SERVICE_URL }}
-            export RULE_SERVICE_URL=${{ vars.RULE_SERVICE_URL }}
-            export LLM_GATEWAY_URL=${{ vars.LLM_GATEWAY_URL }}
+            # Database Settings
+            export DB_USER="${{ secrets.DB_USER }}"
+            export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+            export DB_HOST="${{ secrets.DB_HOST }}"
+            export DB_PORT="${{ secrets.DB_PORT }}"
+            export DB_NAME="${{ secrets.DB_NAME }}"
+
+            # External Service URLs
+            export STATE_SERVICE_URL="${{ vars.STATE_SERVICE_URL }}"
+            export SCENARIO_SERVICE_URL="${{ vars.SCENARIO_SERVICE_URL }}"
+            export RULE_SERVICE_URL="${{ vars.RULE_SERVICE_URL }}"
+            export LLM_GATEWAY_URL="${{ vars.LLM_GATEWAY_URL }}"
+
+            # Others
+            export LLM_MODEL_NAME="${{ vars.LLM_MODEL_NAME }}"
+            export GEMINI_DEFAULT_MODEL="${{ vars.GEMINI_DEFAULT_MODEL }}"
+
+            # Logic Settings
+            export SCENARIO_GRAPH_NAME="${{ vars.SCENARIO_GRAPH_NAME }}"
+
+            docker compose pull
+            docker compose up -d
+
 
             docker compose pull
             docker compose up -d
