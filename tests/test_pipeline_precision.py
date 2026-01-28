@@ -3,7 +3,6 @@ from httpx import Response
 
 from gm.core.config import settings
 from gm.core.engine.game_engine import GameEngine
-from gm.infra.db.database import db
 from gm.plugins.external.http_client import (
     RuleManagerHTTPClient,
     ScenarioManagerHTTPClient,
@@ -12,13 +11,13 @@ from gm.plugins.external.http_client import (
 from gm.plugins.llm.adapter import NarrativeChatModel
 
 
-def get_test_engine():
+def get_test_engine(db_handler):
     return GameEngine(
         rule_client=RuleManagerHTTPClient(),
         scenario_client=ScenarioManagerHTTPClient(),
         state_client=StateManagerHTTPClient(),
         llm=NarrativeChatModel(),
-        db=db,
+        db=db_handler,
     )
 
 
@@ -42,7 +41,9 @@ def create_chat_completion_response(content: str) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_conflict_resolution_scenario_wins(mock_external_services):
+async def test_conflict_resolution_scenario_wins(
+    mock_external_services, mock_db_handler
+):
     """
     Precision Test 1: Conflict Resolution
     Rule validates an action but Scenario corrects the value.
@@ -122,7 +123,7 @@ async def test_conflict_resolution_scenario_wins(mock_external_services):
         "world_snapshot": {"entities": ["player", "goblin"]},
     }
 
-    engine = get_test_engine()
+    engine = get_test_engine(mock_db_handler)
     final_state = await engine.graph.ainvoke(initial_state)
 
     # 4. Verify
@@ -138,7 +139,7 @@ async def test_conflict_resolution_scenario_wins(mock_external_services):
 
 
 @pytest.mark.asyncio
-async def test_narrative_retry_logic(mock_external_services):
+async def test_narrative_retry_logic(mock_external_services, mock_db_handler):
     """
     Precision Test 2: Narrative Retry
     Scenario requires a specific slot word. LLM fails first, succeeds second.
@@ -211,7 +212,7 @@ async def test_narrative_retry_logic(mock_external_services):
         "world_snapshot": {"entities": ["player", "chest"]},
     }
 
-    engine = get_test_engine()
+    engine = get_test_engine(mock_db_handler)
     final_state = await engine.graph.ainvoke(initial_state)
 
     # Verify
@@ -220,7 +221,7 @@ async def test_narrative_retry_logic(mock_external_services):
 
 
 @pytest.mark.asyncio
-async def test_pipeline_halts_on_state_error(mock_external_services):
+async def test_pipeline_halts_on_state_error(mock_external_services, mock_db_handler):
     """
     Precision Test 3: Error Handling
     State Manager returns 500 Error.
@@ -288,7 +289,7 @@ async def test_pipeline_halts_on_state_error(mock_external_services):
     }
 
     # Expect exception
-    engine = get_test_engine()
+    engine = get_test_engine(mock_db_handler)
 
     # Patch the state client to raise an error, overriding the hardcoded mock
     import httpx
@@ -314,7 +315,7 @@ async def test_pipeline_halts_on_state_error(mock_external_services):
 
 
 @pytest.mark.asyncio
-async def test_npc_turn_workflow(mock_external_services):
+async def test_npc_turn_workflow(mock_external_services, mock_db_handler):
     """
     Precision Test 4: NPC Turn Workflow
     Verifies that the NPC turn logic generates input and proceeds through the pipeline.
@@ -390,7 +391,7 @@ async def test_npc_turn_workflow(mock_external_services):
         "world_snapshot": {"entities": ["player", "npc_1"]},
     }
 
-    engine = get_test_engine()
+    engine = get_test_engine(mock_db_handler)
     final_state = await engine.graph.ainvoke(initial_state)
 
     # Verify

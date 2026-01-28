@@ -9,6 +9,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from gm.core.models.context import TurnContext
 from gm.core.models.state import EntityDiff
+from gm.infra.db.database import DatabaseHandler
 from gm.interfaces.external import (
     RuleManagerPort,
     ScenarioManagerPort,
@@ -56,7 +57,7 @@ class GameEngine:
         scenario_client: ScenarioManagerPort,
         state_client: StateManagerPort,
         llm: LLMPort,
-        db: Any,
+        db: DatabaseHandler,
     ):
         self.rule_client = rule_client
         self.scenario_client = scenario_client
@@ -66,22 +67,7 @@ class GameEngine:
         self.graph: CompiledStateGraph = self._build_graph()
 
     async def get_session_history(self, session_id: str) -> List[Dict[str, Any]]:
-        query = """
-            SELECT
-                session_id,
-                act_id,
-                sequence_id,
-                sequence_type,
-                sequence_seq,
-                turn_seq,
-                active_entity_id,
-                user_input,
-                final_output,
-                created_at
-            FROM play_logs
-            WHERE session_id = $1
-            ORDER BY turn_seq ASC
-        """
+        query = self.db.get_query("get_session_history")
         rows = await self.db.fetch(query, session_id)
         return [dict(row) for row in rows]
 
@@ -145,13 +131,7 @@ class GameEngine:
         self, session_id: str, limit: int = 5
     ) -> List[Dict[str, Any]]:
         """Helper to fetch recent history."""
-        query = """
-            SELECT user_input, final_output
-            FROM play_logs
-            WHERE session_id = $1
-            ORDER BY turn_seq DESC
-            LIMIT $2
-        """
+        query = self.db.get_query("fetch_history_limit")
         history: List[Dict[str, Any]] = []
         try:
             rows = await self.db.fetch(query, session_id, limit)
@@ -288,9 +268,7 @@ class GameEngine:
     @log_node_execution
     async def init_turn(self, state: TurnContext) -> TurnContext:
         """Init turn ID."""
-        query = (
-            "SELECT COALESCE(MAX(turn_seq), 0) + 1 FROM play_logs WHERE session_id = $1"
-        )
+        query = self.db.get_query("get_next_turn_seq")
         try:
             val = await self.db.fetchval(query, state["session_id"])
             seq = val if val else 1
@@ -442,24 +420,7 @@ class GameEngine:
     @log_node_execution
     async def save_log(self, state: TurnContext) -> TurnContext:
         """Save Play Log."""
-        query = """
-            INSERT INTO play_logs (
-                turn_id,
-                session_id,
-                turn_seq,
-                user_input,
-                final_output,
-                state_diff,
-                commit_id,
-                act_id,
-                sequence_id,
-                sequence_type,
-                sequence_seq,
-                active_entity_id,
-                world_snapshot
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        """
+        query = self.db.get_query("insert_play_log")
         diffs_json = json.dumps([d.model_dump() for d in state["final_diffs"]])
         snapshot_json = json.dumps(state.get("world_snapshot", {}))
 

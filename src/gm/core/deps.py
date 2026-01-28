@@ -1,7 +1,7 @@
-from typing import Optional
+from fastapi import Request
 
 from gm.core.engine.game_engine import GameEngine
-from gm.infra.db.database import db
+from gm.infra.db.database import DatabaseHandler
 from gm.plugins.external.http_client import (
     RuleManagerHTTPClient,
     ScenarioManagerHTTPClient,
@@ -9,18 +9,19 @@ from gm.plugins.external.http_client import (
 )
 from gm.plugins.llm.adapter import NarrativeChatModel
 
-# Singleton instance
-_engine: Optional[GameEngine] = None
+
+def get_db(request: Request) -> DatabaseHandler:
+    """Dependency to get the database instance from app state."""
+    return request.app.state.db
 
 
-def get_game_engine() -> GameEngine:
-    global _engine
-    if _engine is None:
-        _engine = GameEngine(
-            rule_client=RuleManagerHTTPClient(),
-            scenario_client=ScenarioManagerHTTPClient(),
-            state_client=StateManagerHTTPClient(),
-            llm=NarrativeChatModel(),
-            db=db,
-        )
-    return _engine
+def get_game_engine(request: Request) -> GameEngine:
+    """Dependency to get a configured GameEngine instance."""
+    db = get_db(request)
+    return GameEngine(
+        rule_client=RuleManagerHTTPClient(),
+        scenario_client=ScenarioManagerHTTPClient(),
+        state_client=StateManagerHTTPClient(),
+        llm=NarrativeChatModel(),
+        db=db,
+    )
