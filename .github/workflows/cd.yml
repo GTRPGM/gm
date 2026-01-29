@@ -110,7 +110,7 @@ jobs:
             export DOCKER_CONFIG=$(mktemp -d)
             trap 'rm -rf "$DOCKER_CONFIG"' EXIT
 
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
 
             cd /opt/services/${{ env.SERVICE_NAME }}
 
@@ -134,13 +134,6 @@ jobs:
 
             # Others
             export LLM_MODEL_NAME="${{ vars.LLM_MODEL_NAME }}"
-            export GEMINI_DEFAULT_MODEL="${{ vars.GEMINI_DEFAULT_MODEL }}"
-
-            # Logic Settings
-            export SCENARIO_GRAPH_NAME="${{ vars.SCENARIO_GRAPH_NAME }}"
-
-            docker compose pull
-            docker compose up -d
 
 
             docker compose pull
