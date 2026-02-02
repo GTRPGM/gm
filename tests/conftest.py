@@ -68,7 +68,7 @@ def mock_external_services(respx_mock):
     외부 서비스 호출을 가로챕니다.
     """
     # Rule Manager
-    respx_mock.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
+    respx_mock.post(f"{settings.RULE_ENGINE_URL}/play/scenario").mock(
         return_value=Response(
             200,
             json={
@@ -104,7 +104,7 @@ def mock_external_services(respx_mock):
     )
 
     # State Manager
-    respx_mock.post(f"{settings.STATE_SERVICE_URL}/api/v1/state/commit").mock(
+    respx_mock.post(f"{settings.STATE_MANAGER_URL}/api/v1/state/commit").mock(
         return_value=Response(
             200, json={"commit_id": "mock_commit_12345", "status": "success"}
         )

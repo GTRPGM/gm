@@ -2,7 +2,19 @@
 set -e
 
 # Default URL
-BASE_URL=${1:-"http://localhost:8020"}
+case "$1" in
+  vm)
+    export BASE_URL=$GCP_HOST:8020
+    ;;
+  local|"")
+    export BASE_URL="http://localhost:8020"
+    ;;
+  *)
+    echo "unknown option: $1 (use local or vm)"
+    exit 1
+    ;;
+esac
+
 
 echo "🔹 Target URL: $BASE_URL"
 

@@ -9,9 +9,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
-      - STATE_SERVICE_URL=http://mock-services:8000
+      - STATE_MANAGER_URL=http://mock-services:8000
       - SCENARIO_SERVICE_URL=http://mock-services:8000
-      - RULE_SERVICE_URL=http://mock-services:8000
+      - RULE_ENGINE_URL=http://mock-services:8000
       - LLM_GATEWAY_URL=http://host.docker.internal:8060
     extra_hosts:
       - "host.docker.internal:host-gateway"
