@@ -34,7 +34,7 @@ retry_policy = retry(
 class RuleManagerHTTPClient(RuleManagerPort):
     @retry_policy
     async def get_proposal(self, context: Dict[str, Any]) -> RuleOutcome:
-        url = f"{settings.RULE_SERVICE_URL}/play/scenario"
+        url = f"{settings.RULE_ENGINE_URL}/play/scenario"
         print(f"DEBUG: Requesting Rule Check at {url}")
 
         # Construct payload from context
@@ -79,7 +79,7 @@ class RuleManagerHTTPClient(RuleManagerPort):
             raise e
 
     async def check_health(self) -> bool:
-        url = f"{settings.RULE_SERVICE_URL}/health"
+        url = f"{settings.RULE_ENGINE_URL}/health"
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get(url)
@@ -136,7 +136,7 @@ class StateManagerHTTPClient(StateManagerPort):
         }
 
     async def check_health(self) -> bool:
-        url = f"{settings.STATE_SERVICE_URL}/health"
+        url = f"{settings.STATE_MANAGER_URL}/health"
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get(url)

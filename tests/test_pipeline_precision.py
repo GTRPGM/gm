@@ -55,7 +55,7 @@ async def test_conflict_resolution_scenario_wins(
     # 2. Setup Specific Mocks
 
     # Rule: Suggests damage 10
-    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
+    mock_external_services.post(f"{settings.RULE_ENGINE_URL}/play/scenario").mock(
         return_value=Response(
             200,
             json={
@@ -94,7 +94,7 @@ async def test_conflict_resolution_scenario_wins(
 
     # State: Success
     mock_external_services.post(
-        f"{settings.STATE_SERVICE_URL}/api/v1/state/commit"
+        f"{settings.STATE_MANAGER_URL}/api/v1/state/commit"
     ).mock(
         return_value=Response(
             200, json={"commit_id": "commit_conflict_test", "status": "success"}
@@ -148,7 +148,7 @@ async def test_narrative_retry_logic(mock_external_services, mock_db_handler):
     mock_external_services.routes.clear()
 
     # Rule & Scenario Setup
-    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
+    mock_external_services.post(f"{settings.RULE_ENGINE_URL}/play/scenario").mock(
         return_value=Response(
             200,
             json={
@@ -183,7 +183,7 @@ async def test_narrative_retry_logic(mock_external_services, mock_db_handler):
     )
 
     mock_external_services.post(
-        f"{settings.STATE_SERVICE_URL}/api/v1/state/commit"
+        f"{settings.STATE_MANAGER_URL}/api/v1/state/commit"
     ).mock(return_value=Response(200, json={"commit_id": "commit_retry_test"}))
 
     # LLM: First attempt fail, Second attempt success
@@ -229,7 +229,7 @@ async def test_pipeline_halts_on_state_error(mock_external_services, mock_db_han
     """
     mock_external_services.routes.clear()
 
-    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
+    mock_external_services.post(f"{settings.RULE_ENGINE_URL}/play/scenario").mock(
         return_value=Response(
             200,
             json={
@@ -263,7 +263,7 @@ async def test_pipeline_halts_on_state_error(mock_external_services, mock_db_han
 
     # State Manager Fails
     mock_external_services.post(
-        f"{settings.STATE_SERVICE_URL}/api/v1/state/commit"
+        f"{settings.STATE_MANAGER_URL}/api/v1/state/commit"
     ).mock(return_value=Response(500, json={"error": "Database unavailable"}))
 
     # LLM should NOT be called
@@ -323,7 +323,7 @@ async def test_npc_turn_workflow(mock_external_services, mock_db_handler):
     mock_external_services.routes.clear()
 
     # Rule Check
-    mock_external_services.post(f"{settings.RULE_SERVICE_URL}/play/scenario").mock(
+    mock_external_services.post(f"{settings.RULE_ENGINE_URL}/play/scenario").mock(
         return_value=Response(
             200,
             json={
@@ -359,7 +359,7 @@ async def test_npc_turn_workflow(mock_external_services, mock_db_handler):
 
     # State Commit
     mock_external_services.post(
-        f"{settings.STATE_SERVICE_URL}/api/v1/state/commit"
+        f"{settings.STATE_MANAGER_URL}/api/v1/state/commit"
     ).mock(return_value=Response(200, json={"commit_id": "commit_npc_test"}))
 
     llm_chat_route = mock_external_services.post(

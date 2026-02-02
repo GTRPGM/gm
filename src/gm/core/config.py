@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     @computed_field
     @property
-    def STATE_SERVICE_URL(self) -> str:
+    def STATE_MANAGER_URL(self) -> str:
         return f"http://{self.STATE_MANAGER_HOST}:{self.STATE_MANAGER_PORT}"
 
     @computed_field
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
 
     @computed_field
     @property
-    def RULE_SERVICE_URL(self) -> str:
+    def RULE_ENGINE_URL(self) -> str:
         return f"http://{self.RULE_ENGINE_HOST}:{self.RULE_ENGINE_PORT}"
 
     @computed_field

@@ -127,9 +127,9 @@ jobs:
             export DB_NAME="${{ secrets.DB_NAME }}"
 
             # External Service URLs
-            export STATE_SERVICE_URL="${{ vars.STATE_SERVICE_URL }}"
+            export STATE_MANAGER_URL="${{ vars.STATE_MANAGER_URL }}"
             export SCENARIO_SERVICE_URL="${{ vars.SCENARIO_SERVICE_URL }}"
-            export RULE_SERVICE_URL="${{ vars.RULE_SERVICE_URL }}"
+            export RULE_ENGINE_URL="${{ vars.RULE_ENGINE_URL }}"
             export LLM_GATEWAY_URL="${{ vars.LLM_GATEWAY_URL }}"
 
             # Others
