@@ -13,7 +13,7 @@ async def test_rule_manager_integration(client, respx_mock):
     mock_response = {
         "status": "success",
         "data": {
-            "session_id": session_id,
+            "session_id": 1,  # Changed to int
             "scenario_id": scenario_id,
             "phase_type": "전투",
             "reason": "테스트 판정 성공",
@@ -50,7 +50,10 @@ async def test_rule_manager_integration(client, respx_mock):
     req_json = json.loads(request_data)
 
     # 신규 스키마 필수 필드 확인
-    assert req_json["session_id"] == session_id
+    expected_session_id = (
+        int(session_id) if session_id.isdigit() else hash(session_id) % 100000
+    )
+    assert req_json["session_id"] == expected_session_id
     assert "entities" in req_json
     assert req_json["story"] == "고블린에게 칼을 휘두른다."
 

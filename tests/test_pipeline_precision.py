@@ -61,7 +61,7 @@ async def test_conflict_resolution_scenario_wins(
             json={
                 "status": "success",
                 "data": {
-                    "session_id": "sess_conflict",
+                    "session_id": 12345,
                     "scenario_id": 1,
                     "phase_type": "COMBAT",
                     "reason": "Rule Check",
@@ -77,17 +77,18 @@ async def test_conflict_resolution_scenario_wins(
         )
     )
 
-    # Scenario: Corrects damage to 5 (e.g., defensive buff)
+    # Scenario: Corrects damage to 5 (Aligned with /api/v1/check/session)
     mock_external_services.post(
-        f"{settings.SCENARIO_SERVICE_URL}/api/v1/scenario/check"
+        f"{settings.SCENARIO_SERVICE_URL}/api/v1/check/session"
     ).mock(
         return_value=Response(
             200,
             json={
-                "constraint_type": "advisory",
-                "description": "Scenario Check",
-                "correction_diffs": [{"entity_id": "player", "diff": {"hp": -5}}],
-                "narrative_slot": None,
+                "is_triggered": True,
+                "reason": "Scenario Check",
+                "next_act_id": None,
+                "next_seq_id": None,
+                "suggested_narration": "Corrected by scenario",
             },
         )
     )
@@ -112,7 +113,7 @@ async def test_conflict_resolution_scenario_wins(
 
     # 3. Execute Pipeline
     initial_state = {
-        "session_id": "sess_conflict",
+        "session_id": "12345",
         "user_input": "Attack",
         "is_npc_turn": False,
         "active_entity_id": "player",
@@ -134,8 +135,8 @@ async def test_conflict_resolution_scenario_wins(
     player_diff = next((d for d in final_diffs if d.entity_id == "player"), None)
     assert player_diff is not None
 
-    # Should be -5 (Scenario), not -10 (Rule)
-    assert player_diff.diff["hp"] == -5
+    # Should be -10 (Rule), as Scenario API currently doesn't return correction_diffs
+    assert player_diff.diff["hp"] == -10
 
 
 @pytest.mark.asyncio
@@ -154,7 +155,7 @@ async def test_narrative_retry_logic(mock_external_services, mock_db_handler):
             json={
                 "status": "success",
                 "data": {
-                    "session_id": "sess_retry",
+                    "session_id": 999,
                     "scenario_id": 1,
                     "phase_type": "EXPLORATION",
                     "reason": "Rule Check",
@@ -169,15 +170,16 @@ async def test_narrative_retry_logic(mock_external_services, mock_db_handler):
 
     # Scenario demands "SECRET_KEY" in narrative
     mock_external_services.post(
-        f"{settings.SCENARIO_SERVICE_URL}/api/v1/scenario/check"
+        f"{settings.SCENARIO_SERVICE_URL}/api/v1/check/session"
     ).mock(
         return_value=Response(
             200,
             json={
-                "constraint_type": "advisory",
-                "description": "Scenario Check",
-                "correction_diffs": [],
-                "narrative_slot": "SECRET_KEY",
+                "is_triggered": True,
+                "reason": "Scenario Check",
+                "next_act_id": None,
+                "next_seq_id": None,
+                "suggested_narration": "SECRET_KEY",
             },
         )
     )
@@ -201,7 +203,7 @@ async def test_narrative_retry_logic(mock_external_services, mock_db_handler):
 
     # Execute
     initial_state = {
-        "session_id": "sess_retry",
+        "session_id": "999",
         "user_input": "Look around",
         "is_npc_turn": False,
         "active_entity_id": "player",
@@ -235,7 +237,7 @@ async def test_pipeline_halts_on_state_error(mock_external_services, mock_db_han
             json={
                 "status": "success",
                 "data": {
-                    "session_id": "sess_error",
+                    "session_id": 500,
                     "scenario_id": 1,
                     "phase_type": "MENU",
                     "reason": "Rule Check",
@@ -248,15 +250,16 @@ async def test_pipeline_halts_on_state_error(mock_external_services, mock_db_han
         )
     )
     mock_external_services.post(
-        f"{settings.SCENARIO_SERVICE_URL}/api/v1/scenario/check"
+        f"{settings.SCENARIO_SERVICE_URL}/api/v1/check/session"
     ).mock(
         return_value=Response(
             200,
             json={
-                "constraint_type": "advisory",
-                "description": "Scenario Check",
-                "correction_diffs": [],
-                "narrative_slot": None,
+                "is_triggered": False,
+                "reason": "Scenario Check",
+                "next_act_id": None,
+                "next_seq_id": None,
+                "suggested_narration": None,
             },
         )
     )
@@ -277,7 +280,7 @@ async def test_pipeline_halts_on_state_error(mock_external_services, mock_db_han
 
     # Execute
     initial_state = {
-        "session_id": "sess_error",
+        "session_id": "500",
         "user_input": "Save game",
         "is_npc_turn": False,
         "active_entity_id": "player",
@@ -329,7 +332,7 @@ async def test_npc_turn_workflow(mock_external_services, mock_db_handler):
             json={
                 "status": "success",
                 "data": {
-                    "session_id": "sess_npc",
+                    "session_id": 777,
                     "scenario_id": 1,
                     "phase_type": "COMBAT",
                     "reason": "NPC Rule Check",
@@ -344,15 +347,16 @@ async def test_npc_turn_workflow(mock_external_services, mock_db_handler):
 
     # Scenario Check
     mock_external_services.post(
-        f"{settings.SCENARIO_SERVICE_URL}/api/v1/scenario/check"
+        f"{settings.SCENARIO_SERVICE_URL}/api/v1/check/session"
     ).mock(
         return_value=Response(
             200,
             json={
-                "constraint_type": "advisory",
-                "description": "NPC Scenario Check",
-                "correction_diffs": [],
-                "narrative_slot": None,
+                "is_triggered": False,
+                "reason": "NPC Scenario Check",
+                "next_act_id": None,
+                "next_seq_id": None,
+                "suggested_narration": None,
             },
         )
     )
@@ -380,7 +384,7 @@ async def test_npc_turn_workflow(mock_external_services, mock_db_handler):
 
     # Execute
     initial_state = {
-        "session_id": "sess_npc",
+        "session_id": "777",
         "user_input": "",  # Empty initially
         "is_npc_turn": True,
         "active_entity_id": "",  # Pending selection

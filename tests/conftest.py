@@ -74,7 +74,7 @@ def mock_external_services(respx_mock):
             json={
                 "status": "success",
                 "data": {
-                    "session_id": "test_session",
+                    "session_id": 1,
                     "scenario_id": 1,
                     "phase_type": "탐험",
                     "reason": "Mock Rule Check",
@@ -90,15 +90,16 @@ def mock_external_services(respx_mock):
         )
     )
 
-    # Scenario Manager
-    respx_mock.post(f"{settings.SCENARIO_SERVICE_URL}/api/v1/scenario/check").mock(
+    # Scenario Manager (Aligned with /api/v1/check/session)
+    respx_mock.post(f"{settings.SCENARIO_SERVICE_URL}/api/v1/check/session").mock(
         return_value=Response(
             200,
             json={
-                "constraint_type": "advisory",
-                "description": "Mock Scenario Check",
-                "correction_diffs": [],
-                "narrative_slot": None,
+                "is_triggered": False,
+                "reason": "Mock Scenario Check via Session API",
+                "next_act_id": None,
+                "next_seq_id": None,
+                "suggested_narration": None,  # Set to None to avoid slot requirement
             },
         )
     )
