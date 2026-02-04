@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Dict
 
 from fastapi import FastAPI, Request
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from gm.api.v1.api import api_router
 from gm.core.config import settings
@@ -15,22 +16,30 @@ from gm.infra.db.init_db import init_db
 logger = logging.getLogger("uvicorn.error")
 
 
+@retry(stop=stop_after_attempt(5), wait=wait_fixed(2), reraise=True)
 async def connect_and_init_db(db: DatabaseHandler) -> None:
-    """Initialize database connection and schema."""
+    """Initialize database connection and schema with retries."""
     try:
+        logger.info(
+            "Attempting to connect to database at: %s:%s",
+            settings.DB_HOST,
+            settings.DB_PORT,
+        )
         await asyncio.wait_for(db.connect(), timeout=5.0)
         await init_db(db)
-        logger.info(
-            f"Connected to database and initialized schema: {settings.POSTGRES_DB}"
-        )
+        logger.info(f"Connected to database and initialized schema: {settings.DB_NAME}")
     except Exception as e:
-        logger.error(f"Database connection failed: {e}. Server running without DB.")
+        logger.error(
+            f"Database connection attempt failed. DSN used: {settings.database_dsn}\n"
+            f"Error: {str(e)}"
+        )
+        raise e
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize infrastructure
-    db = DatabaseHandler(settings.database_dsn)
+    db = DatabaseHandler(settings.real_database_dsn)
 
     # Load SQL queries
     queries_dir = os.path.join(os.path.dirname(__file__), "infra", "db", "queries")
