@@ -9,9 +9,10 @@
 
 ### 현황
 
-- 프로젝트 초기화 완료 (`src/gm/__init__.py`, `tests/conftest.py` 존재)
-- 상세 설계 완료 (`global-plan.md`)
-- 구현 시작 단계
+- 프로젝트 초기화 및 핵심 기능 구현 완료
+- LangGraph 기반 파이프라인 구축 완료
+- DB 핸들러 리팩토링 및 테스트 수정 완료 (2026-01-28)
+- 모든 단위/통합 테스트 통과 (`uv run pytest`)
 
 ---
 
@@ -44,16 +45,21 @@
 ### 4단계: 테스트 및 고도화
 
 - [x] 기본 단위/통합 테스트 작성
-- [ ] Mock 서비스를 이용한 파이프라인 정밀 검증
+- [x] Mock 서비스를 이용한 파이프라인 정밀 검증
+- [x] 외부 서비스 API 스펙(OpenAPI)에 따른 요청/응답 정렬 (완료)
+  - [x] Rule Engine: `PlaySceneRequest` 스펙에 맞춰 `locale_id` 추가 및 엔티티 필드명(`state_entity_id`) 조정
+  - [x] Scenario Service: `/api/v1/check/session` 기반 유효성 검사로 전환 및 응답 매핑
 - [ ] 실제 외부 서비스 연동 테스트
 
-### 5단계: 아키텍처 리팩터링 (완료)
+### 5단계: 아키텍처 리팩터링 (진행 중)
 
 - [x] DB 핸들러 리팩터링: 전역 싱글톤 제거 및 명시적 인스턴스화
 - [x] 의존성 주입(DI) 강화: `core/deps.py`를 통한 모든 인프라/엔진 인스턴스 관리
 - [x] FastAPI `lifespan` 통합: DB 커넥션 풀의 생명주기 관리 최적화
 - [x] 쿼리 분리: SQL 문을 외부 `.sql` 파일로 이동 및 관리
-- [x] DB 어댑터 패턴 적용: `interfaces/db.py` 포트 정의 및 `plugins/db` 구현 (진행 예정)
+- [ ] API 스펙 불일치 해결 및 고도화 (예정)
+  - **State Manager**: '단일 커밋' 아키텍처와 '개별 업데이트' API 간의 간극 해결 필요 (Batch Commit API 제안 또는 클라이언트측 어댑터 고도화)
+  - **Scenario Manager**: 규칙 결과(Rule Outcome)를 반영한 시나리오 보정 기능이 현재 API(Validation 위주)에는 부재함. 향후 보정 API 추가 필요.
 
 ---
 

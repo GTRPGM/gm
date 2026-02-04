@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated, Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -5,6 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from gm.core.deps import get_game_engine
 from gm.core.engine.game_engine import GameEngine
 from gm.core.models.input import NpcTurnInput, UserInput
+from gm.exceptions import PipelineError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -16,8 +20,17 @@ async def process_turn(
     try:
         result = await engine.process_player_turn(user_input)
         return result
+    except PipelineError as e:
+        logger.error(f"Pipeline failure: {e.to_dict()}")
+        raise HTTPException(
+            status_code=502,  # Bad Gateway for backend service failures
+            detail=e.to_dict(),
+        ) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error") from e
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail={"error_type": "UnexpectedError", "message": str(e)}
+        ) from e
 
 
 @router.post("/npc-turn")
@@ -27,8 +40,12 @@ async def process_npc_turn(
     try:
         result = await engine.process_npc_turn(input_data.session_id)
         return result
+    except PipelineError as e:
+        raise HTTPException(status_code=502, detail=e.to_dict()) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error") from e
+        raise HTTPException(
+            status_code=500, detail={"error_type": "UnexpectedError", "message": str(e)}
+        ) from e
 
 
 @router.get("/history/{session_id}", response_model=List[Dict[str, Any]])

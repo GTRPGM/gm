@@ -18,9 +18,7 @@ class RuleManagerPort(ABC):
 
 class ScenarioManagerPort(ABC):
     @abstractmethod
-    async def get_proposal(
-        self, content: str, rule_outcome: RuleOutcome
-    ) -> ScenarioSuggestion:
+    async def get_proposal(self, context: Dict[str, Any]) -> ScenarioSuggestion:
         pass
 
     @abstractmethod
@@ -36,6 +34,11 @@ class StateManagerPort(ABC):
     @abstractmethod
     async def get_state(self, session_id: str) -> Dict[str, Any]:
         """Fetch current world state snapshot including entities and relations."""
+        pass
+
+    @abstractmethod
+    async def get_sequence_details(self, session_id: str) -> Dict[str, Any]:
+        """Fetch detailed sequence information including NPCs and enemies."""
         pass
 
     @abstractmethod

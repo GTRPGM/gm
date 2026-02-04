@@ -1,37 +1,44 @@
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RuleRequestEntity(BaseModel):
-    entity_id: Union[str, int]
+    model_config = ConfigDict(populate_by_name=True)
+    state_entity_id: str
+    entity_id: Optional[int] = None
     entity_name: str
+    phase_id: int = 1
+    entity_type: str = "object"
+    quantity: Optional[int] = None
 
 
 class RuleRequestRelation(BaseModel):
-    cause_entity_id: Union[str, int]
-    effect_entity_id: Union[str, int]
+    cause_entity_id: str
+    effect_entity_id: str
     type: str
 
 
 class RuleCheckRequest(BaseModel):
-    session_id: Union[str, int]
-    scenario_id: Union[str, int]
+    session_id: str
+    scenario_id: str
+    locale_id: int = 0
     entities: List[RuleRequestEntity]
     relations: List[RuleRequestRelation]
     story: str
 
 
 class RulesuggestedDiff(BaseModel):
-    entity_id: Union[str, int]
+    model_config = ConfigDict(populate_by_name=True)
+    state_entity_id: str
     diff: Union[
         str, Dict[str, Any]
     ]  # diff can be string (description) or dict (changes)
 
 
 class RuleSuggestedRelation(BaseModel):
-    cause_entity_id: Union[str, int]
-    effect_entity_id: Union[str, int]
+    cause_entity_id: str
+    effect_entity_id: str
     type: str
 
 
@@ -41,8 +48,9 @@ class RuleSuggestion(BaseModel):
 
 
 class RuleOutcomeData(BaseModel):
-    session_id: Union[str, int]
-    scenario_id: Union[str, int]
+    model_config = ConfigDict(populate_by_name=True)
+    session_id: str
+    scenario_id: str
     phase_type: str = "Unspecified"
     reason: str
     success: bool
@@ -53,7 +61,7 @@ class RuleOutcomeData(BaseModel):
 class RuleCheckResponse(BaseModel):
     status: str
     data: RuleOutcomeData
-    message: str
+    message: Optional[str] = None
 
 
 class RuleOutcome(RuleOutcomeData):
@@ -70,5 +78,5 @@ class RuleOutcome(RuleOutcomeData):
             if isinstance(diff_val, str):
                 diff_val = {"_description": diff_val}
 
-            normalized.append({"entity_id": str(d.entity_id), "diff": diff_val})
+            normalized.append({"entity_id": str(d.state_entity_id), "diff": diff_val})
         return normalized

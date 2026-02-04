@@ -1,0 +1,600 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Scenario Service",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Root",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Health Check",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Check Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/system/services/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Services Health Check",
+        "description": "Check the health of external dependent services.",
+        "operationId": "services_health_check_api_v1_system_services_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Services Health Check Api V1 System Services Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/system/version": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Get Version",
+        "operationId": "get_version_api_v1_system_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Get Version Api V1 System Version Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/generation/pure": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Generate Pure",
+        "description": "Generate a scenario from scratch based on a concept.",
+        "operationId": "generate_pure_api_v1_generation_pure_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateScenarioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/generation/grounded": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Generate Grounded",
+        "description": "Generate a scenario grounded in world settings.",
+        "operationId": "generate_grounded_api_v1_generation_grounded_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateScenarioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/generation/informed": {
+      "post": {
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Generate Informed",
+        "description": "Generate a scenario with detailed domain knowledge.",
+        "operationId": "generate_informed_api_v1_generation_informed_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateScenarioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/check/validate": {
+      "post": {
+        "tags": [
+          "Check"
+        ],
+        "summary": "Validate By Ids",
+        "description": "Validate progression using explicit scenario, act, and sequence IDs.",
+        "operationId": "validate_by_ids_api_v1_check_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationOutput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/check/session": {
+      "post": {
+        "tags": [
+          "Check"
+        ],
+        "summary": "Validate By Session",
+        "description": "Validate progression by automatically retrieving state from session ID.",
+        "operationId": "validate_by_session_api_v1_check_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationOutput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/manage/scenarios": {
+      "get": {
+        "tags": [
+          "Manage"
+        ],
+        "summary": "List Scenarios",
+        "description": "List all available scenarios.",
+        "operationId": "list_scenarios_api_v1_manage_scenarios_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Scenarios Api V1 Manage Scenarios Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/manage/scenarios/{scenario_id}/inject": {
+      "post": {
+        "tags": [
+          "Manage"
+        ],
+        "summary": "Inject Scenario",
+        "description": "Inject a scenario into the State Manager.",
+        "operationId": "inject_scenario_api_v1_manage_scenarios__scenario_id__inject_post",
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/manage/sessions/transition": {
+      "post": {
+        "tags": [
+          "Manage"
+        ],
+        "summary": "Transition Session",
+        "description": "Transition a session to a new Act/Sequence.",
+        "operationId": "transition_session_api_v1_manage_sessions_transition_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GenerateScenarioRequest": {
+        "properties": {
+          "concept": {
+            "type": "string",
+            "title": "Concept"
+          }
+        },
+        "type": "object",
+        "required": [
+          "concept"
+        ],
+        "title": "GenerateScenarioRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "SessionCheckRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "user_input": {
+            "type": "string",
+            "title": "User Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "user_input"
+        ],
+        "title": "SessionCheckRequest"
+      },
+      "TransitionRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "next_act_id": {
+            "type": "string",
+            "title": "Next Act Id"
+          },
+          "next_seq_id": {
+            "type": "string",
+            "title": "Next Seq Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "next_act_id",
+          "next_seq_id"
+        ],
+        "title": "TransitionRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ValidationOutput": {
+        "properties": {
+          "is_triggered": {
+            "type": "boolean",
+            "title": "Is Triggered",
+            "description": "Whether the transition condition is met"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Reasoning for the decision"
+          },
+          "next_act_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Act Id"
+          },
+          "next_seq_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Seq Id"
+          },
+          "suggested_narration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Narration",
+            "description": "GM narration for the transition"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_triggered",
+          "reason"
+        ],
+        "title": "ValidationOutput"
+      },
+      "ValidationRequest": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id"
+          },
+          "act_id": {
+            "type": "string",
+            "title": "Act Id"
+          },
+          "seq_id": {
+            "type": "string",
+            "title": "Seq Id"
+          },
+          "user_input": {
+            "type": "string",
+            "title": "User Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "act_id",
+          "seq_id",
+          "user_input"
+        ],
+        "title": "ValidationRequest"
+      }
+    }
+  }
+}

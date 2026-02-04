@@ -13,13 +13,13 @@ async def test_rule_manager_integration(client, respx_mock):
     mock_response = {
         "status": "success",
         "data": {
-            "session_id": session_id,
-            "scenario_id": scenario_id,
+            "session_id": "1",
+            "scenario_id": str(scenario_id),
             "phase_type": "전투",
             "reason": "테스트 판정 성공",
             "success": True,
             "suggested": {
-                "diffs": [{"entity_id": "goblin_scout", "diff": {"hp": 5}}],
+                "diffs": [{"state_entity_id": "goblin_scout", "diff": {"hp": 5}}],
                 "relations": [],
             },
             "value_range": {"damage": 10.0},
