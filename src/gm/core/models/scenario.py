@@ -22,3 +22,5 @@ class ScenarioSuggestion(BaseModel):
     narrative_slot: Optional[str] = Field(
         None, description="서술에 포함되어야 할 필수 요소"
     )
+    next_act_id: Optional[str] = Field(None, description="이동할 다음 액트 ID")
+    next_seq_id: Optional[str] = Field(None, description="이동할 다음 시퀀스 ID")

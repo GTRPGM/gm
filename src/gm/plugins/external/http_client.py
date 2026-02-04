@@ -273,6 +273,8 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
             is_triggered = data.get("is_triggered", False)
             reason = data.get("reason", "No reason provided")
             narration = data.get("suggested_narration")
+            next_act_id = data.get("next_act_id")
+            next_seq_id = data.get("next_seq_id")
 
             from gm.core.models.scenario import ScenarioConstraintType
 
@@ -283,6 +285,8 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
                 description=reason,
                 correction_diffs=[],
                 narrative_slot=narration,
+                next_act_id=next_act_id,
+                next_seq_id=next_seq_id,
             )
 
     async def check_health(self) -> bool:
@@ -359,6 +363,32 @@ class StateManagerHTTPClient(StateManagerPort):
             ):
                 return data["data"]
             return data
+
+    @retry_policy
+    async def update_act(self, session_id: str, act_id: str) -> Dict[str, Any]:
+        url = f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/act"
+        # Extract integer from 'act-X'
+        digits = "".join(filter(str.isdigit, str(act_id)))
+        act_num = int(digits) if digits else 1
+
+        print(f"DEBUG: [StateManager] PUT {url} | act_id: {act_id} (num: {act_num})")
+        async with httpx.AsyncClient() as client:
+            response = await client.put(url, json={"new_act": act_num})
+            response.raise_for_status()
+            return response.json()
+
+    @retry_policy
+    async def update_sequence(self, session_id: str, seq_id: str) -> Dict[str, Any]:
+        url = f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/sequence"
+        # Extract integer from 'seq-X'
+        digits = "".join(filter(str.isdigit, str(seq_id)))
+        seq_num = int(digits) if digits else 1
+
+        print(f"DEBUG: [StateManager] PUT {url} | seq_id: {seq_id} (num: {seq_num})")
+        async with httpx.AsyncClient() as client:
+            response = await client.put(url, json={"new_sequence": seq_num})
+            response.raise_for_status()
+            return response.json()
 
     async def check_health(self) -> bool:
         url = f"{settings.STATE_MANAGER_URL}/health"
