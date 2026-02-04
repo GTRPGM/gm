@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "gm.infra.db"
 
+    PORT: int = 8020
+
     BE_ROUTER_HOST: str = "be-router"
     BE_ROUTER_PORT: int = 8010
 
