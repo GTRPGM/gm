@@ -10,7 +10,6 @@ from tenacity import (
 
 from gm.core.config import settings
 from gm.core.models.rule import (
-    RuleCheckResponse,
     RuleOutcome,
     RuleRequestEntity,
 )
@@ -32,47 +31,173 @@ retry_policy = retry(
 
 
 class RuleManagerHTTPClient(RuleManagerPort):
+    # Rule Engine RelationType Enum mapping (State DB Value -> Rule Engine Enum Value)
+    RELATION_MAP = {
+        "HOSTILE": "적대적",
+        "LITTLE_HOSTILE": "약간 적대적",
+        "NEUTRAL": "중립적",
+        "LITTLE_FRIENDLY": "약간 우호적",
+        "FRIENDLY": "우호적",
+        "OWNERSHIP": "소유",
+        "CONSUME": "소비",
+        "SELF": "본인",
+        # Korean fallback
+        "적대적": "적대적",
+        "약간 적대적": "약간 적대적",
+        "중립적": "중립적",
+        "약간 우호적": "약간 우호적",
+        "우호적": "우호적",
+    }
+
     @retry_policy
     async def get_proposal(self, context: Dict[str, Any]) -> RuleOutcome:
         url = f"{settings.RULE_ENGINE_URL}/play/scenario"
         print(f"DEBUG: Requesting Rule Check at {url}")
 
         # Construct payload from context
-        session_id = context.get("session_id", "unknown_session")
+        session_id = str(context.get("session_id", ""))
         user_input = context.get("user_input", "")
-
-        # Map entities from world_snapshot (List[str] -> List[RuleRequestEntity])
         snapshot = context.get("world_snapshot", {})
-        entity_names = snapshot.get("entities", [])
+        phase_id = int(context.get("phase_id", 1))
 
         req_entities = []
-        for name in entity_names:
-            # Assuming ID is same as name for now, or generating dummy ID if needed
+
+        def parse_entity_id(raw_id: Any) -> int | None:
+            if not raw_id:
+                return None
+            digits = "".join(filter(str.isdigit, str(raw_id)))
+            return int(digits) if digits else None
+
+        master_to_instance = {}
+
+        player_id = snapshot.get("player_id")
+        player_name = snapshot.get("player_name") or snapshot.get("name") or "Player"
+
+        active_entity_id = context.get("active_entity_id")
+
+        if player_id:
             req_entities.append(
-                RuleRequestEntity(entity_id=str(name), entity_name=str(name))
+                RuleRequestEntity(
+                    state_entity_id=str(player_id),
+                    entity_id=1,
+                    entity_name=player_name,
+                    entity_type="player",
+                    phase_id=phase_id,
+                )
+            )
+            master_to_instance["player"] = str(player_id)
+
+        for npc in snapshot.get("npcs", []):
+            m_id = npc.get("scenario_entity_id")
+            s_id = str(npc.get("id"))
+            entity_id = parse_entity_id(m_id)
+            req_entities.append(
+                RuleRequestEntity(
+                    state_entity_id=s_id,
+                    entity_id=entity_id,
+                    entity_name=str(npc.get("name")),
+                    entity_type="npc",
+                    phase_id=phase_id,
+                )
+            )
+            if m_id:
+                master_to_instance[m_id] = s_id
+
+        for enemy in snapshot.get("enemies", []):
+            m_id = enemy.get("scenario_entity_id")
+            s_id = str(enemy.get("id"))
+            entity_id = parse_entity_id(m_id)
+            req_entities.append(
+                RuleRequestEntity(
+                    state_entity_id=s_id,
+                    entity_id=entity_id,
+                    entity_name=str(enemy.get("name")),
+                    entity_type="enemy",
+                    phase_id=phase_id,
+                )
+            )
+            if m_id:
+                master_to_instance[m_id] = s_id
+
+        if active_entity_id and active_entity_id != "player":
+            actual_active_id = master_to_instance.get(
+                active_entity_id, active_entity_id
+            )
+            if not any(
+                e.state_entity_id == str(actual_active_id) for e in req_entities
+            ):
+                req_entities.append(
+                    RuleRequestEntity(
+                        state_entity_id=str(actual_active_id),
+                        entity_name=str(actual_active_id),
+                        entity_type="object",
+                        phase_id=phase_id,
+                    )
+                )
+
+        req_relations = []
+
+        for rel in snapshot.get("entity_relations", []):
+            r_type = rel.get("relation_type", "NEUTRAL")
+            mapped_type = self.RELATION_MAP.get(r_type, "중립적")
+
+            from_m_id = rel.get("from_id")
+            to_m_id = rel.get("to_id")
+            from_s_id = master_to_instance.get(from_m_id, from_m_id)
+            to_s_id = master_to_instance.get(to_m_id, to_m_id)
+
+            req_relations.append(
+                {
+                    "cause_entity_id": str(from_s_id),
+                    "effect_entity_id": str(to_s_id),
+                    "type": mapped_type,
+                    "affinity_score": rel.get("affinity"),
+                }
             )
 
-        # Relations - currently empty in snapshot usually, but check if exists
-        # Assuming snapshot might have 'relations' in future
-        req_relations = []
+        for rel in snapshot.get("player_npc_relations", []):
+            if player_id:
+                r_type = rel.get("relation_type", "NEUTRAL")
+                mapped_type = self.RELATION_MAP.get(r_type, "중립적")
+                npc_s_id = str(rel.get("npc_id"))
+
+                req_relations.append(
+                    {
+                        "cause_entity_id": str(player_id),
+                        "effect_entity_id": npc_s_id,
+                        "type": mapped_type,
+                        "affinity_score": rel.get("affinity_score"),
+                    }
+                )
+
+                # Rule Engine might need bidirectional relations?
+                # Usually affinity is mutual, stick to one for now.
+
+        # Scenario and Locale
+        scenario_id = str(snapshot.get("scenario_id", context.get("scenario_id", "1")))
+        locale_id = int(context.get("locale_id", 0))
 
         payload = {
             "session_id": session_id,
-            "scenario_id": context.get("scenario_id", 0),  # Default to 0/int
+            "scenario_id": scenario_id,
+            "locale_id": locale_id,
             "entities": [e.model_dump() for e in req_entities],
-            "relations": [r.model_dump() for r in req_relations],
+            "relations": req_relations,
             "story": user_input,
         }
 
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(url, json=payload)
+                response = await client.post(url, json=payload, timeout=10.0)
+                if response.status_code == 422:
+                    print(f"DEBUG: 422 Detail: {response.text}")
                 response.raise_for_status()
 
-                # Parse response with new schema wrapper
-                resp_model = RuleCheckResponse(**response.json())
+                # Rule Engine returns WrappedResponse[PlaySceneResponse]
+                resp_json = response.json()
+                data = resp_json.get("data", {})
 
-                return RuleOutcome(**resp_model.data.model_dump())
+                return RuleOutcome(**data)
 
         except Exception as e:
             print(f"DEBUG: Rule Check Failed: {e}")
@@ -90,19 +215,75 @@ class RuleManagerHTTPClient(RuleManagerPort):
 
 class ScenarioManagerHTTPClient(ScenarioManagerPort):
     @retry_policy
-    async def get_proposal(
-        self, content: str, rule_outcome: RuleOutcome
-    ) -> ScenarioSuggestion:
+    async def get_proposal(self, context: Dict[str, Any]) -> ScenarioSuggestion:
+        # Use validate endpoint to avoid 404 on session lookup
+        url = f"{settings.SCENARIO_SERVICE_URL}/api/v1/check/validate"
+
+        rule_outcome = context.get("rule_outcome")
+        if not rule_outcome:
+            raise ValueError("Rule outcome missing in context")
+
+        # Snapshot or context should have current progress
+        snapshot = context.get("world_snapshot", {})
+
+        # Priority: Snapshot (Real DB State) > Context > Rule Outcome > Default
+        scenario_id = str(
+            snapshot.get("scenario_id")
+            or context.get("scenario_id")
+            or rule_outcome.scenario_id
+        )
+        act_id = str(snapshot.get("current_act_id") or context.get("act_id") or "act-1")
+        seq_id = str(
+            snapshot.get("current_sequence_id") or context.get("sequence_id") or "seq-1"
+        )
+
+        user_input = context.get("user_input", "")
+
+        payload = {
+            "scenario_id": scenario_id,
+            "act_id": act_id,
+            "seq_id": seq_id,
+            "user_input": user_input,
+        }
+
+        print(f"DEBUG: [ScenarioManager] POST {url} | Payload: {payload}")
+
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{settings.SCENARIO_SERVICE_URL}/api/v1/scenario/check",
-                json={
-                    "input_text": content,
-                    "rule_outcome": rule_outcome.model_dump(),
-                },
+            try:
+                response = await client.post(url, json=payload)
+                if response.status_code != 200:
+                    detail = (
+                        response.json().get("detail", response.text)
+                        if response.headers.get("content-type") == "application/json"
+                        else response.text
+                    )
+                    print(f"DEBUG: [Scenario] {response.status_code}: {detail[:50]}")
+                    # Raise a more descriptive error for domain issues
+                    if response.status_code == 404:
+                        raise ValueError(f"Scenario Context Missing: {detail}")
+                response.raise_for_status()
+
+                data = response.json()
+
+            except Exception as e:
+                print(f"DEBUG: [ScenarioManager] Request failed: {e}")
+                raise e
+
+            # Map ValidationOutput to ScenarioSuggestion
+            is_triggered = data.get("is_triggered", False)
+            reason = data.get("reason", "No reason provided")
+            narration = data.get("suggested_narration")
+
+            from gm.core.models.scenario import ScenarioConstraintType
+
+            return ScenarioSuggestion(
+                constraint_type=ScenarioConstraintType.MANDATORY
+                if is_triggered
+                else ScenarioConstraintType.ADVISORY,
+                description=reason,
+                correction_diffs=[],
+                narrative_slot=narration,
             )
-            response.raise_for_status()
-            return ScenarioSuggestion(**response.json())
 
     async def check_health(self) -> bool:
         url = f"{settings.SCENARIO_SERVICE_URL}/health"
@@ -115,25 +296,69 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
 
 
 class StateManagerHTTPClient(StateManagerPort):
-    # @retry_policy
+    @retry_policy
     async def commit(self, turn_id: str, diffs: list[EntityDiff]) -> Dict[str, Any]:
-        # MOCK: State Manager is not ready yet. Return dummy success.
-        print(f"DEBUG: [MOCK] State Commit skipped for {turn_id}")
-        return {
-            "commit_id": f"mock_commit_{turn_id}",
-            "status": "success",
-            "timestamp": "2026-01-26T00:00:00Z",
-        }
+        url = f"{settings.STATE_MANAGER_URL}/state/commit"
+        payload = {"turn_id": turn_id, "diffs": [d.model_dump() for d in diffs]}
 
-    # @retry_policy
+        print(f"DEBUG: [StateManager] POST {url} | Payload: {payload}")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload)
+            print(
+                f"DEBUG: [StateManager] {response.status_code} | {response.text[:100]}"
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            if (
+                isinstance(data, dict)
+                and "data" in data
+                and data.get("status") == "success"
+            ):
+                return data["data"]
+            return data
+
+    @retry_policy
     async def get_state(self, session_id: str) -> Dict[str, Any]:
-        # MOCK: State Manager is not ready yet. Return dummy snapshot.
-        print(f"DEBUG: [MOCK] Returning dummy state for {session_id}")
-        return {
-            "entities": ["player", "goblin_scout", "ancient_door", "rusty_sword"],
-            "relations": [],
-            "environment": "Dark Dungeon (Mock State)",
-        }
+        url = f"{settings.STATE_MANAGER_URL}/state/session/{session_id}"
+        print(f"DEBUG: [StateManager] GET {url}")
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            print(
+                f"DEBUG: [StateManager] {response.status_code} | {response.text[:100]}"
+            )
+            response.raise_for_status()
+            # If the response is WrappedResponse, extract 'data'
+            data = response.json()
+            if (
+                isinstance(data, dict)
+                and "data" in data
+                and data.get("status") == "success"
+            ):
+                return data["data"]
+            return data
+
+    @retry_policy
+    async def get_sequence_details(self, session_id: str) -> Dict[str, Any]:
+        url = (
+            f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/sequence/details"
+        )
+        print(f"DEBUG: [StateManager] GET {url}")
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            print(
+                f"DEBUG: [StateManager] {response.status_code} | {response.text[:100]}"
+            )
+            response.raise_for_status()
+            data = response.json()
+            if (
+                isinstance(data, dict)
+                and "data" in data
+                and data.get("status") == "success"
+            ):
+                return data["data"]
+            return data
 
     async def check_health(self) -> bool:
         url = f"{settings.STATE_MANAGER_URL}/health"

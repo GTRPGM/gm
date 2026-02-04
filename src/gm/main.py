@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Dict
 
@@ -9,15 +11,20 @@ from gm.core.config import settings
 from gm.infra.db.database import DatabaseHandler
 from gm.infra.db.init_db import init_db
 
+# Setup logging to use uvicorn's logger configuration
+logger = logging.getLogger("uvicorn.error")
+
 
 async def connect_and_init_db(db: DatabaseHandler) -> None:
     """Initialize database connection and schema."""
     try:
         await asyncio.wait_for(db.connect(), timeout=5.0)
         await init_db(db)
-        print(f"Connected to database and initialized schema: {settings.POSTGRES_DB}")
+        logger.info(
+            f"Connected to database and initialized schema: {settings.POSTGRES_DB}"
+        )
     except Exception as e:
-        print(f"Database connection failed: {e}. Server running without DB.")
+        logger.error(f"Database connection failed: {e}. Server running without DB.")
 
 
 @asynccontextmanager
@@ -26,8 +33,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db = DatabaseHandler(settings.database_dsn)
 
     # Load SQL queries
-    import os
-
     queries_dir = os.path.join(os.path.dirname(__file__), "infra", "db", "queries")
     db.load_queries(queries_dir)
 
@@ -36,12 +41,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Background initialization
     asyncio.create_task(connect_and_init_db(db))
 
-    print("Server starting... Swagger UI: http://localhost:8020/docs")
+    logger.info(f"Server starting... Swagger UI: http://localhost:{settings.PORT}/docs")
     yield
 
     # Clean up
     await db.close()
-    print("Database connection closed.")
+    logger.info("Database connection closed.")
 
 
 app = FastAPI(

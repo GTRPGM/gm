@@ -9,6 +9,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from gm.core.models.context import TurnContext
 from gm.core.models.state import EntityDiff
+from gm.exceptions import PipelineError
 from gm.infra.db.database import DatabaseHandler
 from gm.interfaces.external import (
     RuleManagerPort,
@@ -18,6 +19,18 @@ from gm.interfaces.external import (
 from gm.interfaces.llm import LLMPort
 
 logger = logging.getLogger(__name__)
+
+# Node to Service mapping for error reporting
+NODE_SERVICE_MAP = {
+    "fetch_state": "StateManager",
+    "check_rule": "RuleEngine",
+    "check_scenario": "ScenarioService",
+    "commit_state": "StateManager",
+    "generate_narrative": "LLMGateway",
+    "select_active_entity": "LLMGateway",
+    "generate_npc_input": "LLMGateway",
+    "save_log": "PostgreSQL",
+}
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -30,22 +43,34 @@ def log_node_execution(func: F) -> F:
         node_name = func.__name__
         logger.info(f"▶ START Node: [{node_name}]")
         try:
-            # Handle instance method call (self, state)
-            if len(args) > 0 and hasattr(
-                args[0], "rule_client"
-            ):  # Check if it's the instance
-                result = await func(*args, **kwargs)
-            else:
-                result = await func(*args, **kwargs)
-
+            result = await func(*args, **kwargs)
             logger.info(f"✔ END Node: [{node_name}]")
             if result:
                 keys = list(result.keys())
                 logger.info(f"   -> Updates: {keys}")
             return result
+        except ValueError as e:
+            # Domain/Logic errors (like 404/Context missing)
+            logger.warning(f"⚠ Domain Error in Node [{node_name}]: {e}")
+            service_name = NODE_SERVICE_MAP.get(node_name, "Internal")
+            raise PipelineError(
+                node_name=node_name,
+                message=str(e),
+                original_error=e,
+                service_name=service_name,
+            ) from e
         except Exception as e:
-            logger.error(f"ERROR in Node [{node_name}]: {e}")
-            raise e
+            # System/Network errors
+            logger.error(f"❌ System Error in Node [{node_name}]: {e}")
+            service_name = NODE_SERVICE_MAP.get(node_name, "Internal")
+            raise PipelineError(
+                node_name=node_name,
+                message=str(e),
+                original_error=e,
+                service_name=service_name,
+            ) from e
+
+    return cast(F, wrapper)
 
     return cast(F, wrapper)
 
@@ -78,8 +103,8 @@ class GameEngine:
             "is_npc_turn": False,
             # Context defaults
             "active_entity_id": "player",
-            "act_id": "act_1",
-            "sequence_id": "seq_1",
+            "act_id": "act-1",
+            "sequence_id": "seq-1",
             "sequence_type": "EXPLORATION",
             "sequence_seq": 1,
             # world_snapshot will be loaded by fetch_state node
@@ -109,8 +134,8 @@ class GameEngine:
             "is_npc_turn": True,
             # Context defaults
             "active_entity_id": "npc_pending",  # Will be decided in graph
-            "act_id": "act_1",
-            "sequence_id": "seq_1",
+            "act_id": "act-1",
+            "sequence_id": "seq-1",
             "sequence_type": "COMBAT",
             "sequence_seq": 1,
             # world_snapshot will be loaded by fetch_state node
@@ -150,14 +175,35 @@ class GameEngine:
     async def fetch_state(self, state: TurnContext) -> TurnContext:
         """Fetch latest world state from State Manager."""
         try:
-            snapshot = await self.state_client.get_state(state["session_id"])
-            logger.info(
-                (
-                    "   -> Fetched State Snapshot with "
-                    f"{len(snapshot.get('entities', []))} entities"
-                )
-            )
-            return {"world_snapshot": snapshot}
+            session_id = state["session_id"]
+            # 1. Session Info (player_id, phase, turn 등)
+            snapshot = await self.state_client.get_state(session_id)
+
+            # 2. Sequence Details (NPCs, Enemies, Relations 등)
+            details = await self.state_client.get_sequence_details(session_id)
+
+            snapshot.update(details)
+
+            entities = []
+            for npc in snapshot.get("npcs", []):
+                entities.append(npc.get("scenario_entity_id"))
+            for enemy in snapshot.get("enemies", []):
+                entities.append(enemy.get("scenario_entity_id"))
+
+            snapshot["entities"] = entities
+
+            count = len(snapshot.get("npcs", [])) + len(snapshot.get("enemies", []))
+            logger.info(f"   -> Fetched State Snapshot with {count} entities")
+            return {
+                "world_snapshot": snapshot,
+                "act_id": snapshot.get("current_act_id") or state.get("act_id"),
+                "sequence_id": snapshot.get("current_sequence_id")
+                or state.get("sequence_id"),
+                "sequence_type": snapshot.get("current_phase")
+                or state.get("sequence_type"),
+                "sequence_seq": snapshot.get("current_turn")
+                or state.get("sequence_seq"),
+            }
         except Exception as e:
             logger.error(f"Failed to fetch state: {e}")
             return {}
@@ -293,9 +339,7 @@ class GameEngine:
             logger.warning("Rule outcome is missing in check_scenario")
             raise ValueError("Rule outcome is required for scenario check")
 
-        proposal = await self.scenario_client.get_proposal(
-            state["user_input"], rule_outcome
-        )
+        proposal = await self.scenario_client.get_proposal(state)
         return {"scenario_suggestion": proposal}
 
     @log_node_execution
