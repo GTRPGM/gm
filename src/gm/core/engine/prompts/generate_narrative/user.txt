@@ -1,0 +1,2 @@
+입력: {input_text}
+판정 결과: {outcome}

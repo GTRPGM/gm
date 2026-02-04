@@ -1,6 +1,7 @@
 import functools
 import json
 import logging
+import os
 from typing import Any, Callable, Dict, List, TypeVar, cast
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -183,7 +184,8 @@ class GameEngine:
             details = await self.state_client.get_sequence_details(session_id)
 
             # 3. Fetch all sequences for the current act (for scenario jump logic)
-            # This is currently missing in the Snapshot but important for Scenario Service
+            # This is currently missing in the Snapshot but important
+            # for Scenario Service
             # For now, we assume Scenario Service has its own scenario DB,
             # but GM could provide 'available_sequences' if needed.
 
@@ -213,6 +215,17 @@ class GameEngine:
             logger.error(f"Failed to fetch state: {e}")
             return {}
 
+    def _load_prompt(self, relative_path: str) -> str:
+        """Load a prompt template from a file."""
+        base_dir = os.path.join(os.path.dirname(__file__), "prompts")
+        file_path = os.path.join(base_dir, relative_path)
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception as e:
+            logger.error(f"Failed to load prompt from {file_path}: {e}")
+            return ""
+
     @log_node_execution
     async def select_active_entity(self, state: TurnContext) -> TurnContext:
         """Decide active entity for the turn. Automatically falls back to 'narrator'."""
@@ -237,25 +250,13 @@ class GameEngine:
         candidate_entities.append("narrator")
         entity_list_str = ", ".join([str(e) for e in candidate_entities])
 
+        system_instruction = self._load_prompt("select_active_entity/system.txt")
+        user_prompt = self._load_prompt("select_active_entity/user.txt")
+
         prompt = ChatPromptTemplate.from_messages(
             [
-                (
-                    "system",
-                    (
-                        "당신은 게임 마스터(GM)입니다. "
-                        "지금까지의 이력과 현재 활성화된 엔티티 목록을 바탕으로, "
-                        "다음에 누가 행동할지 결정하십시오. "
-                        "상황을 정리하거나 진행을 유도해야 한다면 'narrator'를 선택하십시오. "
-                        "반드시 해당 엔티티의 ID(entity_id)만 답변하십시오."
-                    ),
-                ),
-                (
-                    "user",
-                    (
-                        f"활성 엔티티 목록: {entity_list_str}\n\n"
-                        f"최근 이력:\n{history}\n\n다음에 행동할 주체는 누구입니까?"
-                    ),
-                ),
+                ("system", system_instruction),
+                ("user", user_prompt),
             ]
         )
 
@@ -298,26 +299,13 @@ class GameEngine:
         goal = sequence_info.get("goal", "상황에 몰입하기")
 
         if actor.lower() == "narrator":
-            system_instruction = (
-                "당신은 TRPG의 나레이터(Narrator)입니다. "
-                "현재 상황을 요약하고, 플레이어가 이야기의 다음 단계로 나아갈 수 있도록 자연스럽게 유도하십시오. "
-                "직접적인 힌트보다는 주변 환경의 변화나 인물의 심리 묘사를 통해 방향을 제시하십시오."
+            system_instruction = self._load_prompt(
+                "generate_npc_input/narrator_system.txt"
             )
-            user_prompt = (
-                f"최근 이력:\n{history}\n\n"
-                f"현재 장소 목표: {goal}\n"
-                f"이동 트리거(참고): {exit_triggers}\n\n"
-                "나레이터로서 현재 상황을 정리하고 플레이어에게 다음 행동을 촉구하는 짧은 서술을 작성하십시오."
-            )
+            user_prompt = self._load_prompt("generate_npc_input/narrator_user.txt")
         else:
-            system_instruction = (
-                f"당신은 TRPG 세션에서 '{actor}' 역할을 맡고 있습니다. "
-                "상황에 몰입하여 자연스럽게 행동하십시오."
-            )
-            user_prompt = (
-                f"최근 이력:\n{history}\n\n"
-                f"당신('{actor}')의 다음 행동을 짧고 간결하게 서술하십시오."
-            )
+            system_instruction = self._load_prompt("generate_npc_input/npc_system.txt")
+            user_prompt = self._load_prompt("generate_npc_input/npc_user.txt")
 
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -329,7 +317,14 @@ class GameEngine:
         chain = prompt | self.llm
 
         try:
-            response_msg = await chain.ainvoke({"history": history})
+            response_msg = await chain.ainvoke(
+                {
+                    "history": history,
+                    "goal": goal,
+                    "exit_triggers": exit_triggers,
+                    "actor": actor,
+                }
+            )
             npc_action_text = response_msg.content
             logger.info(f"   -> Generated Action for [{actor}]: {npc_action_text}")
         except Exception as e:
@@ -483,24 +478,18 @@ class GameEngine:
         is_narrator = active_entity.lower() == "narrator"
 
         if is_narrator:
-            system_instruction = (
-                "당신은 TRPG의 나레이터입니다. "
-                "현재 상황을 정리하고 플레이어에게 다음 여정에 대한 가이드를 제시하십시오. "
-                "판정 결과(outcome)가 모호하더라도 나레이터로서의 권위를 가지고 상황을 주도적으로 서술하십시오. "
-                "플레이어가 현재 시퀀스의 목표를 달성할 수 있도록 주변 환경 묘사나 조언을 포함하십시오."
+            system_instruction = self._load_prompt(
+                "generate_narrative/narrator_system.txt"
             )
         else:
-            system_instruction = (
-                "당신은 TRPG의 게임 마스터(GM)입니다. "
-                "행동에 대한 판정 결과를 바탕으로 결과를 "
-                "**간결하고 명확하게** 서술하십시오."
-                "성공/실패 여부와 그로 인한 즉각적인 변화에 집중하여 짧게 요약하십시오."
-            )
+            system_instruction = self._load_prompt("generate_narrative/gm_system.txt")
+
+        user_prompt = self._load_prompt("generate_narrative/user.txt")
 
         prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", system_instruction),
-                ("user", "입력: {input_text}\n판정 결과: {outcome}"),
+                ("user", user_prompt),
             ]
         )
 
