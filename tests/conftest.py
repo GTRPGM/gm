@@ -74,13 +74,13 @@ def mock_external_services(respx_mock):
             json={
                 "status": "success",
                 "data": {
-                    "session_id": 1,
-                    "scenario_id": 1,
+                    "session_id": "1",
+                    "scenario_id": "1",
                     "phase_type": "탐험",
                     "reason": "Mock Rule Check",
                     "success": True,
                     "suggested": {
-                        "diffs": [{"entity_id": "dummy", "diff": {"hp": 90}}],
+                        "diffs": [{"state_entity_id": "dummy", "diff": {"hp": 90}}],
                         "relations": [],
                     },
                     "value_range": None,
@@ -90,24 +90,60 @@ def mock_external_services(respx_mock):
         )
     )
 
-    # Scenario Manager (Aligned with /api/v1/check/session)
-    respx_mock.post(f"{settings.SCENARIO_SERVICE_URL}/api/v1/check/session").mock(
+    # Scenario Manager
+    respx_mock.post(f"{settings.SCENARIO_SERVICE_URL}/api/v1/check/validate").mock(
         return_value=Response(
             200,
             json={
                 "is_triggered": False,
-                "reason": "Mock Scenario Check via Session API",
+                "reason": "Mock Scenario Check via Validate API",
                 "next_act_id": None,
                 "next_seq_id": None,
-                "suggested_narration": None,  # Set to None to avoid slot requirement
+                "suggested_narration": None,
             },
         )
     )
 
-    # State Manager
-    respx_mock.post(f"{settings.STATE_MANAGER_URL}/api/v1/state/commit").mock(
+    # State Manager Commit
+    respx_mock.post(f"{settings.STATE_MANAGER_URL}/state/commit").mock(
         return_value=Response(
             200, json={"commit_id": "mock_commit_12345", "status": "success"}
+        )
+    )
+
+    # State Manager Get State
+    respx_mock.get(
+        url__regex=f"{settings.STATE_MANAGER_URL}/state/session/[^/]+$"
+    ).mock(
+        return_value=Response(
+            200,
+            json={
+                "status": "success",
+                "data": {
+                    "session_id": "test_session",
+                    "world_snapshot": {
+                        "player_id": "player_1",
+                        "npcs": [],
+                        "enemies": [],
+                    },
+                },
+            },
+        )
+    )
+
+    # State Manager Get Sequence Details
+    respx_mock.get(
+        url__regex=f"{settings.STATE_MANAGER_URL}/state/session/.*/sequence/details"
+    ).mock(
+        return_value=Response(
+            200,
+            json={
+                "status": "success",
+                "data": {
+                    "npcs": [],
+                    "enemies": [],
+                },
+            },
         )
     )
 
