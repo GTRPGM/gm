@@ -1,6 +1,7 @@
 import functools
 import json
 import logging
+import os
 from typing import Any, Callable, Dict, List, TypeVar, cast
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -182,6 +183,12 @@ class GameEngine:
             # 2. Sequence Details (NPCs, Enemies, Relations 등)
             details = await self.state_client.get_sequence_details(session_id)
 
+            # 3. Fetch all sequences for the current act (for scenario jump logic)
+            # This is currently missing in the Snapshot but important
+            # for Scenario Service
+            # For now, we assume Scenario Service has its own scenario DB,
+            # but GM could provide 'available_sequences' if needed.
+
             snapshot.update(details)
 
             entities = []
@@ -208,46 +215,48 @@ class GameEngine:
             logger.error(f"Failed to fetch state: {e}")
             return {}
 
+    def _load_prompt(self, relative_path: str) -> str:
+        """Load a prompt template from a file."""
+        base_dir = os.path.join(os.path.dirname(__file__), "prompts")
+        file_path = os.path.join(base_dir, relative_path)
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception as e:
+            logger.error(f"Failed to load prompt from {file_path}: {e}")
+            return ""
+
     @log_node_execution
     async def select_active_entity(self, state: TurnContext) -> TurnContext:
-        """Decide active entity for the turn."""
+        """Decide active entity for the turn. Automatically falls back to 'narrator'."""
         if not state.get("is_npc_turn"):
             return {"active_entity_id": "player"}
 
         history = await self._fetch_history(state["session_id"], limit=5)
         snapshot = state.get("world_snapshot", {})
 
-        if not snapshot or not snapshot.get("entities"):
-            logger.warning("No entities in world_snapshot. Defaulting to 'npc'.")
-            return {"active_entity_id": "npc"}
-
+        # Gather NPCs and Enemies
         entities = snapshot.get("entities", [])
         candidate_entities = [e for e in entities if str(e).lower() != "player"]
 
+        # If no NPCs or enemies, narrator MUST act
         if not candidate_entities:
-            logger.warning("No NPC entities found. Defaulting to 'npc'.")
-            return {"active_entity_id": "npc"}
+            logger.info(
+                "   -> No entities in sequence. Automatically selecting 'narrator'."
+            )
+            return {"active_entity_id": "narrator"}
 
+        # If there are NPCs, let LLM decide between NPCs and Narrator
+        candidate_entities.append("narrator")
         entity_list_str = ", ".join([str(e) for e in candidate_entities])
+
+        system_instruction = self._load_prompt("select_active_entity/system.txt")
+        user_prompt = self._load_prompt("select_active_entity/user.txt")
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                (
-                    "system",
-                    (
-                        "당신은 게임 마스터(GM)입니다. "
-                        "지금까지의 이력과 현재 활성화된 엔티티 목록을 바탕으로, "
-                        "다음에 누가 행동할지 결정하십시오. "
-                        "반드시 해당 엔티티의 ID(entity_id)만 답변하십시오."
-                    ),
-                ),
-                (
-                    "user",
-                    (
-                        f"활성 엔티티 목록: {entity_list_str}\n\n"
-                        f"최근 이력:\n{history}\n\n다음에 행동할 주체는 누구입니까?"
-                    ),
-                ),
+                ("system", system_instruction),
+                ("user", user_prompt),
             ]
         )
 
@@ -260,54 +269,69 @@ class GameEngine:
                     "history": history,
                 }
             )
-            selected_entity = response_msg.content.strip()
+            selected_entity = response_msg.content.strip().lower()
+
+            # Validation: ensure selected is in our candidate list
+            if selected_entity not in [str(e).lower() for e in candidate_entities]:
+                selected_entity = "narrator"
+
             logger.info(f"   -> Selected Actor: {selected_entity}")
             return {"active_entity_id": selected_entity}
         except Exception as e:
-            logger.error(f"Actor selection failed: {e}. Defaulting to first entity.")
-            return {
-                "active_entity_id": candidate_entities[0]
-                if candidate_entities
-                else "npc"
-            }
+            logger.error(f"Actor selection failed: {e}. Defaulting to 'narrator'.")
+            return {"active_entity_id": "narrator"}
 
     @log_node_execution
     async def generate_npc_input(self, state: TurnContext) -> TurnContext:
-        """Generate NPC action via LLM."""
+        """Generate NPC action or Narrator guidance via LLM."""
         if not state.get("is_npc_turn"):
             return {}
 
         history = await self._fetch_history(state["session_id"])
-        actor = state.get("active_entity_id", "npc")
+        actor = state.get("active_entity_id", "narrator")
+        snapshot = state.get("world_snapshot", {})
+
+        # Additional context for Narrator
+        sequence_info = snapshot.get(
+            "sequence", {}
+        )  # This comes from get_sequence_details
+        exit_triggers = sequence_info.get("exit_triggers", [])
+        goal = sequence_info.get("goal", "상황에 몰입하기")
+
+        if actor.lower() == "narrator":
+            system_instruction = self._load_prompt(
+                "generate_npc_input/narrator_system.txt"
+            )
+            user_prompt = self._load_prompt("generate_npc_input/narrator_user.txt")
+        else:
+            system_instruction = self._load_prompt("generate_npc_input/npc_system.txt")
+            user_prompt = self._load_prompt("generate_npc_input/npc_user.txt")
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                (
-                    "system",
-                    (
-                        f"당신은 TRPG 세션에서 '{actor}' 역할을 맡고 있습니다. "
-                        "상황에 몰입하여 자연스럽게 행동하십시오."
-                    ),
-                ),
-                (
-                    "user",
-                    (
-                        f"최근 이력:\n{history}\n\n"
-                        f"당신('{actor}')의 다음 행동을 짧고 간결하게 서술하십시오."
-                    ),
-                ),
+                ("system", system_instruction),
+                ("user", user_prompt),
             ]
         )
 
         chain = prompt | self.llm
 
         try:
-            response_msg = await chain.ainvoke({"actor": actor, "history": history})
+            response_msg = await chain.ainvoke(
+                {
+                    "history": history,
+                    "goal": goal,
+                    "exit_triggers": exit_triggers,
+                    "actor": actor,
+                }
+            )
             npc_action_text = response_msg.content
-            logger.info(f"   -> Generated NPC Action for [{actor}]: {npc_action_text}")
+            logger.info(f"   -> Generated Action for [{actor}]: {npc_action_text}")
         except Exception as e:
-            logger.error(f"Failed to generate NPC action: {e}")
-            npc_action_text = f"{actor} acts mysteriously."
+            logger.error(f"Failed to generate actor input: {e}")
+            npc_action_text = (
+                "주변에 정적이 흐릅니다. 당신의 다음 결정을 기다리는 듯합니다."
+            )
 
         return {"user_input": npc_action_text}
 
@@ -327,7 +351,23 @@ class GameEngine:
 
     @log_node_execution
     async def check_rule(self, state: TurnContext) -> TurnContext:
-        """Call Rule Manager."""
+        """Call Rule Manager. Skip for Narrator."""
+        active_entity = state.get("active_entity_id", "player")
+        if active_entity.lower() == "narrator":
+            from gm.core.models.rule import RuleOutcome
+
+            logger.info("   -> Actor is Narrator. Skipping Rule Check.")
+            # Return a default success outcome for narrator
+            return {
+                "rule_outcome": RuleOutcome(
+                    session_id=state.get("session_id", "unknown"),
+                    scenario_id=state.get("scenario_id", "1"),
+                    success=True,
+                    reason="나레이터의 서술입니다.",
+                    suggested={"diffs": [], "relations": []},
+                )
+            }
+
         proposal = await self.rule_client.get_proposal(state)
         return {"rule_outcome": proposal}
 
@@ -401,7 +441,23 @@ class GameEngine:
 
         final_diffs = state.get("final_diffs", [])
 
+        # 1. Commit entity diffs
         result = await self.state_client.commit(turn_id, final_diffs)
+
+        # 2. Handle Location Transition (Act/Sequence Jump) from Scenario Service
+        scenario = state.get("scenario_suggestion")
+        if scenario:
+            if scenario.next_act_id:
+                logger.info(f"   -> Transitioning to ACT: {scenario.next_act_id}")
+                await self.state_client.update_act(
+                    state["session_id"], scenario.next_act_id
+                )
+            elif scenario.next_seq_id:
+                logger.info(f"   -> Transitioning to SEQUENCE: {scenario.next_seq_id}")
+                await self.state_client.update_sequence(
+                    state["session_id"], scenario.next_seq_id
+                )
+
         return {"commit_id": result["commit_id"]}
 
     @log_node_execution
@@ -422,23 +478,18 @@ class GameEngine:
         is_narrator = active_entity.lower() == "narrator"
 
         if is_narrator:
-            system_instruction = (
-                "당신은 TRPG의 게임 마스터(GM) 겸 나레이터입니다. "
-                "현재 상황, 분위기, 감각적인 디테일을 생생하고 풍부하게 서술하십시오. "
-                "플레이어의 선택을 유도하거나 상황을 정리하여 몰입감을 높이십시오."
+            system_instruction = self._load_prompt(
+                "generate_narrative/narrator_system.txt"
             )
         else:
-            system_instruction = (
-                "당신은 TRPG의 게임 마스터(GM)입니다. "
-                "행동에 대한 판정 결과를 바탕으로 결과를 "
-                "**간결하고 명확하게** 서술하십시오."
-                "성공/실패 여부와 그로 인한 즉각적인 변화에 집중하여 짧게 요약하십시오."
-            )
+            system_instruction = self._load_prompt("generate_narrative/gm_system.txt")
+
+        user_prompt = self._load_prompt("generate_narrative/user.txt")
 
         prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", system_instruction),
-                ("user", "입력: {input_text}\n판정 결과: {outcome}"),
+                ("user", user_prompt),
             ]
         )
 

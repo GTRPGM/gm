@@ -1,12 +1,44 @@
 import asyncio
+import logging
 from typing import Annotated, Any, Dict
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from gm.core.deps import get_game_engine
 from gm.core.engine.game_engine import GameEngine
+from gm.infra.db.init_db import init_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.post("/reconnect")
+async def reconnect_database(request: Request) -> Dict[str, Any]:
+    """
+    Manually triggers database reconnection and schema initialization.
+    """
+    db = request.app.state.db
+    try:
+        # Close existing pool if any
+        await db.close()
+
+        # Attempt new connection
+        await asyncio.wait_for(db.connect(), timeout=10.0)
+
+        # Re-initialize schema (idempotent)
+        await init_db(db)
+
+        return {
+            "status": "ok",
+            "message": "Database reconnected and initialized successfully",
+        }
+    except Exception as e:
+        logger.error(f"Manual reconnection failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "error", "message": f"Reconnection failed: {str(e)}"},
+        ) from e
 
 
 @router.get("/status")

@@ -10,7 +10,7 @@ on:
   push:
     branches:
       - "main"
-      - "ops/28-deploy-standard"
+      - "fix/28-deploy-standard"
   workflow_dispatch:
 
 env:

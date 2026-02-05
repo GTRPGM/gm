@@ -42,5 +42,15 @@ class StateManagerPort(ABC):
         pass
 
     @abstractmethod
+    async def update_act(self, session_id: str, act_id: str) -> Dict[str, Any]:
+        """Update session's current act."""
+        pass
+
+    @abstractmethod
+    async def update_sequence(self, session_id: str, seq_id: str) -> Dict[str, Any]:
+        """Update session's current sequence."""
+        pass
+
+    @abstractmethod
     async def check_health(self) -> bool:
         pass
