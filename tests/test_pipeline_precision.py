@@ -1,5 +1,6 @@
 import pytest
 from httpx import Response
+from unittest.mock import AsyncMock
 
 from gm.core.config import settings
 from gm.core.engine.game_engine import GameEngine
@@ -38,6 +39,19 @@ def create_chat_completion_response(content: str) -> dict:
             }
         ],
     }
+
+
+@pytest.mark.asyncio
+async def test_check_rule_fallback_on_rule_engine_error(mock_db_handler):
+    engine = get_test_engine(mock_db_handler)
+    engine.rule_client.get_proposal = AsyncMock(side_effect=RuntimeError("boom"))
+
+    result = await engine.check_rule(
+        {"session_id": "s1", "scenario_id": "scn-1", "active_entity_id": "player"}
+    )
+
+    assert result["rule_outcome"].success is True
+    assert result["rule_outcome"].scenario_id == "scn-1"
 
 
 @pytest.mark.asyncio
