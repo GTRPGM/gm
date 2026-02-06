@@ -352,23 +352,33 @@ class GameEngine:
     @log_node_execution
     async def check_rule(self, state: TurnContext) -> TurnContext:
         """Call Rule Manager. Skip for Narrator."""
+        from gm.core.models.rule import RuleOutcome
+
         active_entity = state.get("active_entity_id", "player")
         if active_entity.lower() == "narrator":
-            from gm.core.models.rule import RuleOutcome
-
             logger.info("   -> Actor is Narrator. Skipping Rule Check.")
             # Return a default success outcome for narrator
             return {
                 "rule_outcome": RuleOutcome(
                     session_id=state.get("session_id", "unknown"),
-                    scenario_id=state.get("scenario_id", "1"),
+                    scenario_id=state.get("scenario_id", "unknown"),
                     success=True,
                     reason="나레이터의 서술입니다.",
                     suggested={"diffs": [], "relations": []},
                 )
             }
 
-        proposal = await self.rule_client.get_proposal(state)
+        try:
+            proposal = await self.rule_client.get_proposal(state)
+        except Exception as e:
+            logger.warning("rule_engine_unavailable_fallback error=%s", type(e).__name__)
+            proposal = RuleOutcome(
+                session_id=state.get("session_id", "unknown"),
+                scenario_id=state.get("scenario_id", "unknown"),
+                success=True,
+                reason="룰 엔진 오류로 기본 판정을 적용합니다.",
+                suggested={"diffs": [], "relations": []},
+            )
         return {"rule_outcome": proposal}
 
     @log_node_execution
@@ -495,12 +505,14 @@ class GameEngine:
 
         chain = prompt | self.llm
 
+        snapshot_json = json.dumps(state.get("world_snapshot", {}), ensure_ascii=False)
         narrative = ""
         for _ in range(max_retries):
             response_msg = await chain.ainvoke(
                 {
                     "input_text": state["user_input"],
                     "outcome": rule_outcome.model_dump(),
+                    "world_snapshot": snapshot_json,
                 }
             )
             narrative = response_msg.content
