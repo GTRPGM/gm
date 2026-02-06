@@ -686,9 +686,15 @@ class GameEngine:
         try:
             snapshot = await self.state_client.get_state(session_id)
             details = await self.state_client.get_sequence_details(session_id)
-            act_details = await self.state_client.get_act_details(session_id)
             snapshot.update(details)
-            snapshot["act"] = act_details
+
+            # `act/details` can be unavailable depending on state-manager version.
+            # Summary should still be generated from current session/sequence context.
+            try:
+                act_details = await self.state_client.get_act_details(session_id)
+            except Exception:
+                act_details = {}
+            snapshot["act"] = act_details if isinstance(act_details, dict) else {}
 
             # Entities list string
             entities = []
@@ -731,7 +737,11 @@ class GameEngine:
         try:
             response_msg = await chain.ainvoke(
                 {
-                    "act_name": snapshot.get("act", {}).get("act_name", "Unknown"),
+                    "act_name": (
+                        snapshot.get("act", {}).get("act_name")
+                        or snapshot.get("current_act_id")
+                        or "Unknown"
+                    ),
                     "sequence_name": snapshot.get("sequence_name", "Unknown"),
                     "goal": snapshot.get("goal", "생존"),
                     "entities": entity_str,
