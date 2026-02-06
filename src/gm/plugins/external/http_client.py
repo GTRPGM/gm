@@ -11,17 +11,17 @@ from tenacity import (
 )
 
 from gm.core.config import settings
+from gm.interfaces.external import (
+    RuleManagerPort,
+    ScenarioManagerPort,
+    StateManagerPort,
+)
 from gm.schemas.common import EntityDiff
 from gm.schemas.rule_engine import (
     RuleOutcome,
     RuleRequestEntity,
 )
 from gm.schemas.scenario import ScenarioSuggestion
-from gm.interfaces.external import (
-    RuleManagerPort,
-    ScenarioManagerPort,
-    StateManagerPort,
-)
 
 logger = logging.getLogger(__name__)
 ACT_ID_RE = re.compile(r"^act-\d+(?:-\d+)*$")
@@ -42,6 +42,7 @@ def _normalize_hierarchy_id(raw: Any, pattern: re.Pattern[str], default: str) ->
     if pattern.match(value):
         return value
     return default
+
 
 # 기본 재시도 설정: 예외 발생 시 최대 3회 시도, 지수 백오프 적용 (최소 0.1초, 최대 2초)
 retry_policy = retry(
@@ -167,12 +168,14 @@ class RuleManagerHTTPClient(RuleManagerPort):
             from_s_id = master_to_instance.get(from_m_id, from_m_id)
             to_s_id = master_to_instance.get(to_m_id, to_m_id)
 
-            req_relations.append({
-                "cause_entity_id": str(from_s_id),
-                "effect_entity_id": str(to_s_id),
-                "type": mapped_type,
-                "affinity_score": rel.get("affinity"),
-            })
+            req_relations.append(
+                {
+                    "cause_entity_id": str(from_s_id),
+                    "effect_entity_id": str(to_s_id),
+                    "type": mapped_type,
+                    "affinity_score": rel.get("affinity"),
+                }
+            )
 
         for rel in snapshot.get("player_npc_relations", []):
             if player_id:
@@ -180,18 +183,18 @@ class RuleManagerHTTPClient(RuleManagerPort):
                 mapped_type = self.RELATION_MAP.get(r_type, "중립적")
                 npc_s_id = str(rel.get("npc_id"))
 
-                req_relations.append({
-                    "cause_entity_id": str(player_id),
-                    "effect_entity_id": npc_s_id,
-                    "type": mapped_type,
-                    "affinity_score": rel.get("affinity_score"),
-                })
+                req_relations.append(
+                    {
+                        "cause_entity_id": str(player_id),
+                        "effect_entity_id": npc_s_id,
+                        "type": mapped_type,
+                        "affinity_score": rel.get("affinity_score"),
+                    }
+                )
 
         # Scenario and Locale
         scenario_id = str(
-            context.get("scenario_id")
-            or snapshot.get("scenario_id")
-            or "unknown"
+            context.get("scenario_id") or snapshot.get("scenario_id") or "unknown"
         )
         locale_id = int(context.get("locale_id", 0))
 
@@ -274,7 +277,9 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
                 response = await client.post(url, json=payload, timeout=15.0)
                 if response.status_code == 404:
                     try:
-                        detail = response.json().get("detail", response.text or "Not Found")
+                        detail = response.json().get(
+                            "detail", response.text or "Not Found"
+                        )
                     except Exception:
                         detail = response.text or "Not Found"
                     raise ValueError(f"Scenario Context Missing: {detail}")
@@ -296,16 +301,22 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
             next_act_id = data.get("next_act_id")
             next_seq_id = data.get("next_seq_id")
             if next_act_id and not ACT_ID_RE.match(str(next_act_id)):
-                logger.warning("invalid_next_act_id_from_scenario_service id=%s", next_act_id)
+                logger.warning(
+                    "invalid_next_act_id_from_scenario_service id=%s", next_act_id
+                )
                 next_act_id = None
             if next_seq_id and not SEQ_ID_RE.match(str(next_seq_id)):
-                logger.warning("invalid_next_seq_id_from_scenario_service id=%s", next_seq_id)
+                logger.warning(
+                    "invalid_next_seq_id_from_scenario_service id=%s", next_seq_id
+                )
                 next_seq_id = None
 
             from gm.schemas.scenario import ScenarioConstraintType
 
             return ScenarioSuggestion(
-                constraint_type=ScenarioConstraintType.MANDATORY if is_triggered else ScenarioConstraintType.ADVISORY,
+                constraint_type=ScenarioConstraintType.MANDATORY
+                if is_triggered
+                else ScenarioConstraintType.ADVISORY,
                 description=reason,
                 correction_diffs=[],
                 narrative_slot=narration,
@@ -333,7 +344,11 @@ class StateManagerHTTPClient(StateManagerPort):
             response = await client.post(url, json=payload, timeout=10.0)
             response.raise_for_status()
             data = response.json()
-            if isinstance(data, dict) and data.get("status") == "success" and "data" in data:
+            if (
+                isinstance(data, dict)
+                and data.get("status") == "success"
+                and "data" in data
+            ):
                 return data["data"]
             return data
 
@@ -344,7 +359,11 @@ class StateManagerHTTPClient(StateManagerPort):
             response = await client.get(url, timeout=5.0)
             response.raise_for_status()
             data = response.json()
-            if isinstance(data, dict) and data.get("status") == "success" and "data" in data:
+            if (
+                isinstance(data, dict)
+                and data.get("status") == "success"
+                and "data" in data
+            ):
                 return data["data"]
             return data
 
@@ -355,30 +374,40 @@ class StateManagerHTTPClient(StateManagerPort):
             response = await client.get(url, timeout=5.0)
             response.raise_for_status()
             data = response.json()
-            if isinstance(data, dict) and data.get("status") == "success" and "data" in data:
+            if (
+                isinstance(data, dict)
+                and data.get("status") == "success"
+                and "data" in data
+            ):
                 return data["data"]
             return data
 
     @retry_policy
     async def get_sequence_details(self, session_id: str) -> Dict[str, Any]:
-        url = f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/sequence/details"
+        url = (
+            f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/sequence/details"
+        )
         async with httpx.AsyncClient() as client:
             response = await client.get(url, timeout=5.0)
             response.raise_for_status()
             data = response.json()
-            if isinstance(data, dict) and data.get("status") == "success" and "data" in data:
+            if (
+                isinstance(data, dict)
+                and data.get("status") == "success"
+                and "data" in data
+            ):
                 return data["data"]
             return data
 
     @retry_policy
-    async def update_act(self, session_id: str, act_id: str, seq_id: str) -> Dict[str, Any]:
+    async def update_act(
+        self, session_id: str, act_id: str, seq_id: str
+    ) -> Dict[str, Any]:
         url = f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/act"
         act_id = _normalize_hierarchy_id(act_id, ACT_ID_RE, "act-1")
         seq_id = _normalize_hierarchy_id(seq_id, SEQ_ID_RE, "seq-1")
         act_digits = "".join(filter(str.isdigit, str(act_id)))
-        seq_digits = "".join(filter(str.isdigit, str(seq_id)))
         act_num = int(act_digits) if act_digits else 1
-        seq_num = int(seq_digits) if seq_digits else 1
         payload = {
             "new_act": act_num,
             "new_act_id": str(act_id),

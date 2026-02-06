@@ -1,13 +1,13 @@
 import httpx
 import pytest
 
-from gm.schemas.rule_engine import RuleOutcome, RuleSuggestion
-from gm.schemas.common import EntityDiff
 from gm.plugins.external.http_client import (
     RuleManagerHTTPClient,
     ScenarioManagerHTTPClient,
     StateManagerHTTPClient,
 )
+from gm.schemas.common import EntityDiff
+from gm.schemas.rule_engine import RuleOutcome, RuleSuggestion
 
 
 @pytest.mark.asyncio
@@ -187,7 +187,10 @@ async def test_scenario_manager_normalizes_invalid_sequence_ids(respx_mock):
     result = await client.get_proposal(
         {
             "rule_outcome": outcome,
-            "world_snapshot": {"current_act_id": "act-1", "current_sequence_id": "창고_탐색"},
+            "world_snapshot": {
+                "current_act_id": "act-1",
+                "current_sequence_id": "창고_탐색",
+            },
         }
     )
 

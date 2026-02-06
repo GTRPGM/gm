@@ -1,6 +1,7 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from httpx import Response
-from unittest.mock import AsyncMock
 
 from gm.core.config import settings
 from gm.core.engine.game_engine import GameEngine

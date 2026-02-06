@@ -385,7 +385,9 @@ class GameEngine:
         try:
             proposal = await self.rule_client.get_proposal(state)
         except Exception as e:
-            logger.warning("rule_engine_unavailable_fallback error=%s", type(e).__name__)
+            logger.warning(
+                "rule_engine_unavailable_fallback error=%s", type(e).__name__
+            )
             proposal = RuleOutcome(
                 session_id=state.get("session_id", "unknown"),
                 scenario_id=state.get("scenario_id", "unknown"),
@@ -474,7 +476,8 @@ class GameEngine:
             if scenario.next_act_id:
                 if not scenario.next_seq_id:
                     raise ValueError(
-                        "Scenario transition mismatch: next_seq_id is required when next_act_id is set"
+                        "Scenario transition mismatch: "
+                        "next_seq_id is required when next_act_id is set"
                     )
                 logger.info(f"   -> Transitioning to ACT: {scenario.next_act_id}")
                 await self.state_client.update_act(
@@ -566,9 +569,7 @@ class GameEngine:
                     "required_narrative_instruction": required_narrative_instruction,
                     "history": history,
                     "active_entity_id": active_entity,
-                    "world_snapshot": json.dumps(
-                        snapshot_view, ensure_ascii=False
-                    ),
+                    "world_snapshot": json.dumps(snapshot_view, ensure_ascii=False),
                 }
                 response_msg = await chain.ainvoke(context)
             except Exception as e:

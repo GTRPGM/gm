@@ -16,6 +16,7 @@ from langchain_core.runnables import RunnableLambda
 from pydantic import Field
 
 from gm.core.config import settings
+from gm.interfaces.llm import LLMPort
 from gm.schemas.llm import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -23,7 +24,6 @@ from gm.schemas.llm import (
 from gm.schemas.llm import (
     ChatMessage as SchemaChatMessage,
 )
-from gm.interfaces.llm import LLMPort
 
 
 class NarrativeChatModel(LLMPort):

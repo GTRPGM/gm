@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from gm.core.deps import get_game_engine
 from gm.core.engine.game_engine import GameEngine
-from gm.schemas.api import GameTurnResponse, NpcTurnInput, UserInput
 from gm.exceptions import PipelineError
+from gm.schemas.api import GameTurnResponse, NpcTurnInput, UserInput
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ async def get_session_summary(
     session_id = payload.get("session_id")
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id is required")
-    
+
     try:
         summary = await engine.generate_summary(session_id)
         return {"session_id": session_id, "summary": summary}

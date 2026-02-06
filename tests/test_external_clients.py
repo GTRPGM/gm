@@ -2,11 +2,11 @@ import httpx
 import pytest
 
 from gm.core.config import settings
-from gm.schemas.rule_engine import RuleOutcome
 from gm.plugins.external.http_client import (
     RuleManagerHTTPClient,
     ScenarioManagerHTTPClient,
 )
+from gm.schemas.rule_engine import RuleOutcome
 
 
 @pytest.mark.asyncio
