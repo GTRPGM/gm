@@ -1,8 +1,8 @@
 from typing import Any, Dict, List, Optional, TypedDict
 
-from gm.core.models.rule import RuleOutcome
-from gm.core.models.scenario import ScenarioSuggestion
-from gm.core.models.state import EntityDiff
+from gm.schemas.common import EntityDiff
+from gm.schemas.rule_engine import RuleOutcome
+from gm.schemas.scenario import ScenarioSuggestion
 
 
 class TurnContext(TypedDict, total=False):
@@ -13,6 +13,7 @@ class TurnContext(TypedDict, total=False):
 
     # --- Input ---
     session_id: str
+    scenario_id: Optional[str]
     user_input: str
     is_npc_turn: bool
 

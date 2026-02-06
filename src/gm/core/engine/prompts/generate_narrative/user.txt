@@ -1,3 +1,6 @@
+[최근 대화 내역]
+{history}
+
 [현재 정보(World Snapshot)]
 {world_snapshot}
 
@@ -8,3 +11,4 @@
 
 입력: {input_text}
 판정 결과: {outcome}
+{required_narrative_instruction}

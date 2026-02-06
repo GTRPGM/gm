@@ -1,4 +1,4 @@
-from pydantic import computed_field
+from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,11 +13,11 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
 
-    DB_USER: str = "postgres"
-    DB_PASSWORD: str = "postgres"
-    DB_HOST: str = "localhost"
-    DB_PORT: int = 5432
-    DB_NAME: str = "gm.infra.db"
+    DB_USER: str = Field("postgres", validation_alias="DB_USER")
+    DB_PASSWORD: str = Field("postgres", validation_alias="DB_PASSWORD")
+    DB_HOST: str = Field("localhost", validation_alias="DB_SERVER")
+    DB_PORT: int = Field(5432, validation_alias="DB_PORT")
+    DB_NAME: str = Field("gtrpgm", validation_alias="DB_DB")
 
     PORT: int = 8020
 

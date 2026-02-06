@@ -14,6 +14,10 @@ from gm.infra.db.init_db import init_db
 
 # Setup logging to use uvicorn's logger configuration
 logger = logging.getLogger("uvicorn.error")
+gm_logger = logging.getLogger("gm")
+gm_logger.setLevel(logging.INFO)
+for handler in logger.handlers:
+    gm_logger.addHandler(handler)
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_fixed(2), reraise=True)

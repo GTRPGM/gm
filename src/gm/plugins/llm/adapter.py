@@ -16,11 +16,11 @@ from langchain_core.runnables import RunnableLambda
 from pydantic import Field
 
 from gm.core.config import settings
-from gm.core.models.llm import (
+from gm.schemas.llm import (
     ChatCompletionRequest,
     ChatCompletionResponse,
 )
-from gm.core.models.llm import (
+from gm.schemas.llm import (
     ChatMessage as SchemaChatMessage,
 )
 from gm.interfaces.llm import LLMPort
@@ -32,7 +32,9 @@ class NarrativeChatModel(LLMPort):
     """
 
     base_url: str = Field(default_factory=lambda: settings.LLM_GATEWAY_URL)
-    client: httpx.AsyncClient = Field(default_factory=lambda: httpx.AsyncClient())
+    client: httpx.AsyncClient = Field(
+        default_factory=lambda: httpx.AsyncClient(timeout=60.0)
+    )
 
     @property
     def _llm_type(self) -> str:

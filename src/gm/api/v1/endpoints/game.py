@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from gm.core.deps import get_game_engine
 from gm.core.engine.game_engine import GameEngine
-from gm.core.models.input import NpcTurnInput, UserInput
+from gm.schemas.api import GameTurnResponse, NpcTurnInput, UserInput
 from gm.exceptions import PipelineError
 
 logger = logging.getLogger(__name__)
@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/turn")
+@router.post("/turn", response_model=GameTurnResponse)
 async def process_turn(
     user_input: UserInput, engine: Annotated[GameEngine, Depends(get_game_engine)]
-) -> Dict[str, Any]:
+) -> Any:
     try:
         result = await engine.process_player_turn(user_input)
         return result
@@ -33,10 +33,10 @@ async def process_turn(
         ) from e
 
 
-@router.post("/npc-turn")
+@router.post("/npc-turn", response_model=GameTurnResponse)
 async def process_npc_turn(
     input_data: NpcTurnInput, engine: Annotated[GameEngine, Depends(get_game_engine)]
-) -> Dict[str, Any]:
+) -> Any:
     try:
         result = await engine.process_npc_turn(input_data.session_id)
         return result
@@ -55,5 +55,20 @@ async def get_history(
     try:
         history = await engine.get_session_history(session_id)
         return history
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/summary", response_model=Dict[str, str])
+async def get_session_summary(
+    payload: Dict[str, str], engine: Annotated[GameEngine, Depends(get_game_engine)]
+) -> Dict[str, str]:
+    session_id = payload.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required")
+    
+    try:
+        summary = await engine.generate_summary(session_id)
+        return {"session_id": session_id, "summary": summary}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
