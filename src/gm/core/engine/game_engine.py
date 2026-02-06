@@ -375,7 +375,7 @@ class GameEngine:
             return {
                 "rule_outcome": RuleOutcome(
                     session_id=state.get("session_id", "unknown"),
-                    scenario_id=state.get("scenario_id", "unknown"),
+                    scenario_id=state.get("scenario_id") or "unknown",
                     success=True,
                     reason="나레이터의 서술입니다.",
                     suggested={"diffs": [], "relations": []},
@@ -390,7 +390,7 @@ class GameEngine:
             )
             proposal = RuleOutcome(
                 session_id=state.get("session_id", "unknown"),
-                scenario_id=state.get("scenario_id", "unknown"),
+                scenario_id=state.get("scenario_id") or "unknown",
                 success=True,
                 reason="룰 엔진 오류로 기본 판정을 적용합니다.",
                 suggested={"diffs": [], "relations": []},
