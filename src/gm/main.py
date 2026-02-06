@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Dict
+from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from tenacity import retry, stop_after_attempt, wait_fixed
@@ -11,6 +11,7 @@ from gm.api.v1.api import api_router
 from gm.core.config import settings
 from gm.infra.db.database import DatabaseHandler
 from gm.infra.db.init_db import init_db
+from gm.schemas.api import HealthResponse, RootResponse
 
 # Setup logging to use uvicorn's logger configuration
 logger = logging.getLogger("uvicorn.error")
@@ -72,16 +73,16 @@ app = FastAPI(
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
-@app.get("/")
-async def root() -> Dict[str, str]:
-    return {"message": "GM Core Service is running"}
+@app.get("/", response_model=RootResponse)
+async def root() -> RootResponse:
+    return RootResponse(message="GM Core Service is running")
 
 
-@app.get("/health")
-async def health_check(request: Request) -> Dict[str, str]:
+@app.get("/health", response_model=HealthResponse)
+async def health_check(request: Request) -> HealthResponse:
     db: DatabaseHandler = request.app.state.db
     try:
         await db.fetchval("SELECT 1")
-        return {"status": "ok", "db": "connected"}
+        return HealthResponse(status="ok", db="connected")
     except Exception as e:
-        return {"status": "error", "db": str(e)}
+        return HealthResponse(status="error", db=str(e))

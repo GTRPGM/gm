@@ -42,7 +42,18 @@ async def test_get_history_success(client, mocker):
 
     mock_engine = mocker.AsyncMock()
     mock_engine.get_session_history.return_value = [
-        {"turn_id": "1", "narrative": "test"}
+        {
+            "session_id": "session_123",
+            "act_id": "act-1",
+            "sequence_id": "seq-1",
+            "sequence_type": "EXPLORATION",
+            "sequence_seq": 1,
+            "turn_seq": 1,
+            "active_entity_id": "player",
+            "user_input": "test input",
+            "narrative": "test",
+            "created_at": "2026-02-07T00:00:00+00:00",
+        }
     ]
 
     mocker.patch.dict(app.dependency_overrides, {get_game_engine: lambda: mock_engine})
@@ -50,7 +61,8 @@ async def test_get_history_success(client, mocker):
 
     assert response.status_code == 200
     assert len(response.json()) == 1
-    assert response.json()[0]["turn_id"] == "1"
+    assert response.json()[0]["turn_seq"] == 1
+    assert response.json()[0]["narrative"] == "test"
 
 
 @pytest.mark.asyncio

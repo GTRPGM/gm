@@ -17,6 +17,7 @@ from gm.interfaces.external import (
     StateManagerPort,
 )
 from gm.interfaces.llm import LLMPort
+from gm.schemas.api import TurnOutputType
 from gm.schemas.common import EntityDiff
 
 logger = logging.getLogger(__name__)
@@ -92,10 +93,57 @@ class GameEngine:
         self.db = db
         self.graph: CompiledStateGraph = self._build_graph()
 
+    def _resolve_active_entity_name(
+        self, snapshot: Dict[str, Any], active_entity_id: str | None
+    ) -> str:
+        actor = (active_entity_id or "").strip()
+        actor_l = actor.lower()
+        if actor_l == "player":
+            return "player"
+        if actor_l == "narrator":
+            return "narrator"
+
+        for key in ("npcs", "enemies"):
+            for entity in snapshot.get(key, []) or []:
+                entity_name = entity.get("name")
+                candidate_ids = [
+                    entity.get("scenario_entity_id"),
+                    entity.get("entity_id"),
+                    entity.get("scenario_npc_id"),
+                    entity.get("scenario_enemy_id"),
+                ]
+                candidate_ids_l = [str(v).lower() for v in candidate_ids if v]
+                if actor_l in candidate_ids_l:
+                    return entity_name or actor
+                if entity_name and str(entity_name).lower() == actor_l:
+                    return entity_name
+
+        return actor or "unknown"
+
     async def get_session_history(self, session_id: str) -> List[Dict[str, Any]]:
         query = self.db.get_query("get_session_history")
         rows = await self.db.fetch(query, session_id)
-        return [dict(row) for row in rows]
+        history: List[Dict[str, Any]] = []
+        for row in rows:
+            history.append(
+                {
+                    "session_id": row["session_id"],
+                    "act_id": row["act_id"],
+                    "sequence_id": row["sequence_id"],
+                    "sequence_type": row["sequence_type"],
+                    "sequence_seq": row["sequence_seq"],
+                    "turn_seq": row["turn_seq"],
+                    "active_entity_id": row["active_entity_id"],
+                    "user_input": row["user_input"],
+                    "narrative": row["final_output"],
+                    "created_at": (
+                        row["created_at"].isoformat()
+                        if row.get("created_at") is not None
+                        else None
+                    ),
+                }
+            )
+        return history
 
     async def process_player_turn(self, user_input: Any) -> Dict[str, Any]:
         player_state = {
@@ -118,6 +166,8 @@ class GameEngine:
             "narrative": player_result_state["narrative"],
             "commit_id": player_result_state["commit_id"],
             "active_entity_id": player_result_state.get("active_entity_id", "player"),
+            "active_entity_name": "player",
+            "output_type": TurnOutputType.NARRATION,
             "is_npc_turn": False,
         }
 
@@ -150,11 +200,24 @@ class GameEngine:
         # 그래프 비동기 실행
         final_state = await self.graph.ainvoke(initial_state)
 
+        output_type = (
+            TurnOutputType.NARRATION
+            if str(final_state.get("active_entity_id", "")).lower() == "narrator"
+            else TurnOutputType.NPC
+        )
+        active_entity_id = final_state.get("active_entity_id")
+        active_entity_name = self._resolve_active_entity_name(
+            final_state.get("world_snapshot", {}) or {},
+            active_entity_id,
+        )
+
         return {
             "turn_id": final_state["turn_id"],
             "narrative": final_state["narrative"],
             "commit_id": final_state["commit_id"],
-            "active_entity_id": final_state.get("active_entity_id"),  # Return who acted
+            "active_entity_id": active_entity_id,  # Return who acted
+            "active_entity_name": active_entity_name,
+            "output_type": output_type,
             "is_npc_turn": True,
         }
 

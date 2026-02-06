@@ -11,6 +11,8 @@ async def test_process_turn_success(client):
     assert "turn_id" in data
     assert "narrative" in data
     assert "commit_id" in data
+    assert data["output_type"] == "narration"
+    assert data["active_entity_name"] == "player"
     assert data["turn_id"].startswith("test_session_1:")
     print(f"\nTurn Response: {data}")
 
@@ -27,6 +29,9 @@ async def test_process_npc_turn(client):
     assert "turn_id" in result
     assert "narrative" in result
     assert "commit_id" in result
+    assert result["output_type"] in ("npc", "narration")
+    assert "active_entity_name" in result
+    assert result["active_entity_name"]
     assert result.get("is_npc_turn") is True
     assert result["turn_id"].startswith(f"{session_id}:")
     print(f"\nNPC Turn Response: {result}")

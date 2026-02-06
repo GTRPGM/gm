@@ -1,20 +1,21 @@
 import asyncio
 import logging
-from typing import Annotated, Any, Dict
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from gm.core.deps import get_game_engine
 from gm.core.engine.game_engine import GameEngine
 from gm.infra.db.init_db import init_db
+from gm.schemas.api import SystemReconnectResponse, SystemStatusResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-@router.post("/reconnect")
-async def reconnect_database(request: Request) -> Dict[str, Any]:
+@router.post("/reconnect", response_model=SystemReconnectResponse)
+async def reconnect_database(request: Request) -> SystemReconnectResponse:
     """
     Manually triggers database reconnection and schema initialization.
     """
@@ -29,10 +30,10 @@ async def reconnect_database(request: Request) -> Dict[str, Any]:
         # Re-initialize schema (idempotent)
         await init_db(db)
 
-        return {
-            "status": "ok",
-            "message": "Database reconnected and initialized successfully",
-        }
+        return SystemReconnectResponse(
+            status="ok",
+            message="Database reconnected and initialized successfully",
+        )
     except Exception as e:
         logger.error(f"Manual reconnection failed: {str(e)}", exc_info=True)
         raise HTTPException(
@@ -41,10 +42,10 @@ async def reconnect_database(request: Request) -> Dict[str, Any]:
         ) from e
 
 
-@router.get("/status")
+@router.get("/status", response_model=SystemStatusResponse)
 async def check_system_status(
     engine: Annotated[GameEngine, Depends(get_game_engine)],
-) -> Dict[str, Any]:
+) -> SystemStatusResponse:
     """
     Checks the health of all dependent services:
     - Rule Manager
@@ -83,4 +84,4 @@ async def check_system_status(
 
     overall_status = "ok" if all(v == "ok" for v in results.values()) else "degraded"
 
-    return {"status": overall_status, "services": results}
+    return SystemStatusResponse(status=overall_status, services=results)
