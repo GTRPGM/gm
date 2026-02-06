@@ -1,0 +1,7 @@
+현재 시퀀스 유형: {sequence_type}
+
+최근 이력:
+{history}
+
+당신('{actor}')의 다음 행동을 짧고 간결하게 서술하십시오.
+{sequence_type} 상황임을 고려하여 행동하십시오.

@@ -1,0 +1,5671 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "GTRPGM State Manager",
+    "description": "TRPG \uac8c\uc784 \uc0c1\ud0dc\ub97c \uad00\ub9ac\ud558\uace0 \ucd5c\uc2e0 \uc0c1\ud0dc\ub97c \uc81c\uacf5\ud558\ub294 API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/state/scenario/inject": {
+      "post": {
+        "tags": [
+          "Scenario Management"
+        ],
+        "summary": "\uc2dc\ub098\ub9ac\uc624 \ubc0f \ub9c8\uc2a4\ud130 \ub370\uc774\ud130 \uc8fc\uc785",
+        "description": "\uc2dc\ub098\ub9ac\uc624 \uba54\ud0c0\ub370\uc774\ud130\uc640 \ub9c8\uc2a4\ud130 \ub370\uc774\ud130\ub97c \ud55c \ubc88\uc5d0 \uc8fc\uc785\ud569\ub2c8\ub2e4.",
+        "operationId": "inject_scenario_state_scenario_inject_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioInjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_ScenarioInjectResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/start": {
+      "post": {
+        "tags": [
+          "Session Lifecycle"
+        ],
+        "summary": "\uac8c\uc784 \uc138\uc158 \uc2dc\uc791",
+        "operationId": "start_session_state_session_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_SessionInfo_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/scenarios": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get All Scenarios Endpoint",
+        "operationId": "get_all_scenarios_endpoint_state_scenarios_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_ScenarioInfo__"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/scenario/{scenario_id}": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Scenario Endpoint",
+        "operationId": "get_scenario_endpoint_state_scenario__scenario_id__get",
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_ScenarioInfo_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/sessions": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get All Sessions Endpoint",
+        "operationId": "get_all_sessions_endpoint_state_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_SessionInfo__"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/sessions/active": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Active Sessions Endpoint",
+        "operationId": "get_active_sessions_endpoint_state_sessions_active_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_SessionInfo__"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/sessions/paused": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Paused Sessions Endpoint",
+        "operationId": "get_paused_sessions_endpoint_state_sessions_paused_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_SessionInfo__"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/sessions/ended": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Ended Sessions Endpoint",
+        "operationId": "get_ended_sessions_endpoint_state_sessions_ended_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_SessionInfo__"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Session",
+        "operationId": "get_session_state_session__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_SessionInfo_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/player/{player_id}": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Player",
+        "operationId": "get_player_state_player__player_id__get",
+        "parameters": [
+          {
+            "name": "player_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Player Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_FullPlayerState_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/inventory": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Inventory",
+        "operationId": "get_inventory_state_session__session_id__inventory_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_InventoryItem__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/items": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Items",
+        "operationId": "get_items_state_session__session_id__items_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_ItemInfo__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/npcs": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Npcs",
+        "operationId": "get_npcs_state_session__session_id__npcs_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_NPCInfo__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/enemies": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Enemies",
+        "operationId": "get_enemies_state_session__session_id__enemies_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "active_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Active Only"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_EnemyInfo__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/phase": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Phase",
+        "operationId": "get_phase_state_session__session_id__phase_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_PhaseChangeResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Change Phase Endpoint",
+        "operationId": "change_phase_endpoint_state_session__session_id__phase_put",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhaseChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_PhaseChangeResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/turn": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Turn",
+        "operationId": "get_turn_state_session__session_id__turn_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_TurnAddResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/act": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Act",
+        "operationId": "get_act_state_session__session_id__act_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Change Act Endpoint",
+        "operationId": "change_act_endpoint_state_session__session_id__act_put",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_ActChangeResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/act/details": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Current Act Details",
+        "description": "\ud604\uc7ac \uc138\uc158\uc774 \uc9c4\ud589 \uc911\uc778 \uc561\ud2b8\uc758 \uc0c1\uc138 \uc815\ubcf4(\uc81c\ubaa9, \uc124\uba85, \uba54\ud0c0\ub370\uc774\ud130)\ub97c \uc870\ud68c\ud569\ub2c8\ub2e4.",
+        "operationId": "get_current_act_details_state_session__session_id__act_details_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_ScenarioActInfo_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/sequence": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Sequence",
+        "operationId": "get_sequence_state_session__session_id__sequence_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Change Sequence Endpoint",
+        "operationId": "change_sequence_endpoint_state_session__session_id__sequence_put",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SequenceChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_SequenceChangeResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/sequence/details": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Current Sequence Details",
+        "description": "\ud604\uc7ac \uc138\uc158\uc774 \uc9c4\ud589 \uc911\uc778 \uc2dc\ud000\uc2a4\uc758 \uc0c1\uc138 \uc815\ubcf4(\uc5d4\ud2f0\ud2f0, \uad00\uacc4 \ud3ec\ud568)\ub97c \uc870\ud68c\ud569\ub2c8\ub2e4.",
+        "operationId": "get_current_sequence_details_state_session__session_id__sequence_details_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_SequenceDetailInfo_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/location": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Location",
+        "operationId": "get_location_state_session__session_id__location_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "State Updates"
+        ],
+        "summary": "Update Location Endpoint",
+        "operationId": "update_location_endpoint_state_session__session_id__location_put",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__str__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/progress": {
+      "get": {
+        "tags": [
+          "State Inquiry"
+        ],
+        "summary": "Get Progress",
+        "operationId": "get_progress_state_session__session_id__progress_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/player/{player_id}/hp": {
+      "put": {
+        "tags": [
+          "State Updates"
+        ],
+        "summary": "Update Player Hp Endpoint",
+        "operationId": "update_player_hp_endpoint_state_player__player_id__hp_put",
+        "parameters": [
+          {
+            "name": "player_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Player Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerHPUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_PlayerHPUpdateResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/player/{player_id}/stats": {
+      "put": {
+        "tags": [
+          "State Updates"
+        ],
+        "summary": "Update Player Stats Endpoint",
+        "operationId": "update_player_stats_endpoint_state_player__player_id__stats_put",
+        "parameters": [
+          {
+            "name": "player_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Player Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerStatsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Any_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/inventory/update": {
+      "put": {
+        "tags": [
+          "State Updates"
+        ],
+        "summary": "Update Inventory",
+        "operationId": "update_inventory_state_inventory_update_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/npc/affinity": {
+      "put": {
+        "tags": [
+          "State Updates"
+        ],
+        "summary": "Update Npc Affinity Endpoint",
+        "operationId": "update_npc_affinity_endpoint_state_npc_affinity_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NPCAffinityUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_NPCAffinityUpdateResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/enemy/{enemy_instance_id}/hp": {
+      "put": {
+        "tags": [
+          "State Updates"
+        ],
+        "summary": "Update Enemy Hp Endpoint",
+        "operationId": "update_enemy_hp_endpoint_state_enemy__enemy_instance_id__hp_put",
+        "parameters": [
+          {
+            "name": "enemy_instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Enemy Instance Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnemyHPUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_EnemyHPUpdateResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/enemy/{enemy_instance_id}/defeat": {
+      "post": {
+        "tags": [
+          "State Updates"
+        ],
+        "summary": "Defeat Enemy Endpoint",
+        "operationId": "defeat_enemy_endpoint_state_enemy__enemy_instance_id__defeat_post",
+        "parameters": [
+          {
+            "name": "enemy_instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Enemy Instance Id"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__str__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/player/item/earn": {
+      "post": {
+        "tags": [
+          "State Updates"
+        ],
+        "summary": "Earn Item Endpoint",
+        "operationId": "earn_item_endpoint_state_player_item_earn_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemEarnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/player/item/use": {
+      "post": {
+        "tags": [
+          "State Updates"
+        ],
+        "summary": "Use Item Endpoint",
+        "operationId": "use_item_endpoint_state_player_item_use_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemUseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/end": {
+      "post": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "End Session",
+        "operationId": "end_session_state_session__session_id__end_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__str__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/pause": {
+      "post": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Pause Session",
+        "operationId": "pause_session_state_session__session_id__pause_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__str__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/resume": {
+      "post": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Resume Session",
+        "operationId": "resume_session_state_session__session_id__resume_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__str__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/enemy/spawn": {
+      "post": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Spawn Enemy Endpoint",
+        "operationId": "spawn_enemy_endpoint_state_session__session_id__enemy_spawn_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnemySpawnRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_SpawnResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/enemy/{enemy_instance_id}": {
+      "delete": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Remove Enemy Endpoint",
+        "operationId": "remove_enemy_endpoint_state_session__session_id__enemy__enemy_instance_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "enemy_instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Enemy Instance Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_RemoveEntityResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/npc/spawn": {
+      "post": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Spawn Npc Endpoint",
+        "operationId": "spawn_npc_endpoint_state_session__session_id__npc_spawn_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NPCSpawnRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_SpawnResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/npc/{npc_instance_id}": {
+      "delete": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Remove Npc Endpoint",
+        "operationId": "remove_npc_endpoint_state_session__session_id__npc__npc_instance_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "npc_instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Npc Instance Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_RemoveEntityResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/turn/add": {
+      "post": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Add Turn Endpoint",
+        "operationId": "add_turn_endpoint_state_session__session_id__turn_add_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_TurnAddResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/act/add": {
+      "post": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Add Act Endpoint",
+        "operationId": "add_act_endpoint_state_session__session_id__act_add_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_ActChangeResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/act/back": {
+      "post": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Back Act Endpoint",
+        "operationId": "back_act_endpoint_state_session__session_id__act_back_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_ActChangeResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/sequence/add": {
+      "post": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Add Sequence Endpoint",
+        "operationId": "add_sequence_endpoint_state_session__session_id__sequence_add_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_SequenceChangeResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/sequence/back": {
+      "post": {
+        "tags": [
+          "Session Management"
+        ],
+        "summary": "Back Sequence Endpoint",
+        "operationId": "back_sequence_endpoint_state_session__session_id__sequence_back_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_SequenceChangeResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/turns": {
+      "get": {
+        "tags": [
+          "TRACE - Turn History"
+        ],
+        "summary": "Get Turn History Endpoint",
+        "description": "\ud2b9\uc815 \uc138\uc158\uc758 Turn \uc774\ub825 \uc870\ud68c (\uc804\uccb4)",
+        "operationId": "get_turn_history_endpoint_state_session__session_id__turns_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/turns/recent": {
+      "get": {
+        "tags": [
+          "TRACE - Turn History"
+        ],
+        "summary": "Get Recent Turns Endpoint",
+        "description": "\ucd5c\uadfc N\uac1c\uc758 Turn \uc870\ud68c",
+        "operationId": "get_recent_turns_endpoint_state_session__session_id__turns_recent_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "\uc870\ud68c\ud560 Turn \uc218",
+              "default": 10,
+              "title": "Limit"
+            },
+            "description": "\uc870\ud68c\ud560 Turn \uc218"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/turn/latest": {
+      "get": {
+        "tags": [
+          "TRACE - Turn History"
+        ],
+        "summary": "Get Latest Turn Endpoint",
+        "description": "\uac00\uc7a5 \ucd5c\uadfc Turn \uc870\ud68c",
+        "operationId": "get_latest_turn_endpoint_state_session__session_id__turn_latest_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Union_Dict_str__Any___NoneType__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/turn/{turn_number}": {
+      "get": {
+        "tags": [
+          "TRACE - Turn History"
+        ],
+        "summary": "Get Turn Details Endpoint",
+        "description": "\ud2b9\uc815 Turn\uc758 \uc0c1\uc138 \uc815\ubcf4 \uc870\ud68c",
+        "operationId": "get_turn_details_endpoint_state_session__session_id__turn__turn_number__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "turn_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Turn Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/turns/range": {
+      "get": {
+        "tags": [
+          "TRACE - Turn History"
+        ],
+        "summary": "Get Turn Range Endpoint",
+        "description": "Turn \ubc94\uc704 \uc870\ud68c (\ub9ac\ud50c\ub808\uc774\uc6a9)",
+        "operationId": "get_turn_range_endpoint_state_session__session_id__turns_range_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "\uc2dc\uc791 Turn \ubc88\ud638",
+              "title": "Start"
+            },
+            "description": "\uc2dc\uc791 Turn \ubc88\ud638"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "\uc885\ub8cc Turn \ubc88\ud638",
+              "title": "End"
+            },
+            "description": "\uc885\ub8cc Turn \ubc88\ud638"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/turns/statistics/by-phase": {
+      "get": {
+        "tags": [
+          "TRACE - Turn History"
+        ],
+        "summary": "Get Turn Statistics By Phase Endpoint",
+        "description": "Phase\ubcc4 Turn \uc218 \uc9d1\uacc4 \ubc0f \uc0c1\uc138 \ud1b5\uacc4",
+        "operationId": "get_turn_statistics_by_phase_endpoint_state_session__session_id__turns_statistics_by_phase_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/turns/statistics/by-type": {
+      "get": {
+        "tags": [
+          "TRACE - Turn History"
+        ],
+        "summary": "Get Turn Statistics By Type Endpoint",
+        "description": "Turn Type\ubcc4 \uc9d1\uacc4",
+        "operationId": "get_turn_statistics_by_type_endpoint_state_session__session_id__turns_statistics_by_type_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/turns/duration-analysis": {
+      "get": {
+        "tags": [
+          "TRACE - Turn History"
+        ],
+        "summary": "Get Turn Duration Analysis Endpoint",
+        "description": "\uac01 Turn\uc758 \uc18c\uc694 \uc2dc\uac04 \uacc4\uc0b0 \ubc0f \ubd84\uc11d",
+        "operationId": "get_turn_duration_analysis_endpoint_state_session__session_id__turns_duration_analysis_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/turns/summary": {
+      "get": {
+        "tags": [
+          "TRACE - Turn History"
+        ],
+        "summary": "Get Turn Summary Endpoint",
+        "description": "Turn \uc694\uc57d \ub9ac\ud3ec\ud2b8",
+        "operationId": "get_turn_summary_endpoint_state_session__session_id__turns_summary_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/phases": {
+      "get": {
+        "tags": [
+          "TRACE - Phase History"
+        ],
+        "summary": "Get Phase History Endpoint",
+        "description": "\ud2b9\uc815 \uc138\uc158\uc758 Phase \uc804\ud658 \uc774\ub825 \uc870\ud68c (\uc804\uccb4)",
+        "operationId": "get_phase_history_endpoint_state_session__session_id__phases_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/phases/recent": {
+      "get": {
+        "tags": [
+          "TRACE - Phase History"
+        ],
+        "summary": "Get Recent Phases Endpoint",
+        "description": "\ucd5c\uadfc N\uac1c\uc758 Phase \uc804\ud658 \uc870\ud68c",
+        "operationId": "get_recent_phases_endpoint_state_session__session_id__phases_recent_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "\uc870\ud68c\ud560 Phase \uc218",
+              "default": 5,
+              "title": "Limit"
+            },
+            "description": "\uc870\ud68c\ud560 Phase \uc218"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/phases/by-phase": {
+      "get": {
+        "tags": [
+          "TRACE - Phase History"
+        ],
+        "summary": "Get Phase By Phase Endpoint",
+        "description": "\ud2b9\uc815 Phase\ub85c\uc758 \uc804\ud658 \uc774\ub825\ub9cc \uc870\ud68c",
+        "operationId": "get_phase_by_phase_endpoint_state_session__session_id__phases_by_phase_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Phase \ud0c0\uc785 (exploration, combat, dialogue, rest)",
+              "title": "Phase"
+            },
+            "description": "Phase \ud0c0\uc785 (exploration, combat, dialogue, rest)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/phases/range": {
+      "get": {
+        "tags": [
+          "TRACE - Phase History"
+        ],
+        "summary": "Get Phase Range Endpoint",
+        "description": "\ud2b9\uc815 Turn \ubc94\uc704\uc758 Phase \uc804\ud658 \uc870\ud68c",
+        "operationId": "get_phase_range_endpoint_state_session__session_id__phases_range_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "start_turn",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "\uc2dc\uc791 Turn \ubc88\ud638",
+              "title": "Start Turn"
+            },
+            "description": "\uc2dc\uc791 Turn \ubc88\ud638"
+          },
+          {
+            "name": "end_turn",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "\uc885\ub8cc Turn \ubc88\ud638",
+              "title": "End Turn"
+            },
+            "description": "\uc885\ub8cc Turn \ubc88\ud638"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/phase/latest": {
+      "get": {
+        "tags": [
+          "TRACE - Phase History"
+        ],
+        "summary": "Get Latest Phase Endpoint",
+        "description": "\uac00\uc7a5 \ucd5c\uadfc Phase \uc804\ud658 \uc870\ud68c",
+        "operationId": "get_latest_phase_endpoint_state_session__session_id__phase_latest_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_Union_Dict_str__Any___NoneType__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/phases/statistics": {
+      "get": {
+        "tags": [
+          "TRACE - Phase History"
+        ],
+        "summary": "Get Phase Statistics Endpoint",
+        "description": "Phase\ubcc4 \ucd1d \uc18c\uc694 \uc2dc\uac04 \ubc0f \uc804\ud658 \ud69f\uc218",
+        "operationId": "get_phase_statistics_endpoint_state_session__session_id__phases_statistics_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/phases/pattern": {
+      "get": {
+        "tags": [
+          "TRACE - Phase History"
+        ],
+        "summary": "Get Phase Pattern Endpoint",
+        "description": "Phase \uc804\ud658 \ud328\ud134 \uc870\ud68c",
+        "operationId": "get_phase_pattern_endpoint_state_session__session_id__phases_pattern_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state/session/{session_id}/phases/summary": {
+      "get": {
+        "tags": [
+          "TRACE - Phase History"
+        ],
+        "summary": "Get Phase Summary Endpoint",
+        "description": "Phase \uc804\ud658 \uc694\uc57d \ub9ac\ud3ec\ud2b8",
+        "operationId": "get_phase_summary_endpoint_state_session__session_id__phases_summary_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WrappedResponse_List_Dict_str__Any___"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "\ud14c\uc2a4\ud2b8 - \uc11c\ubc84 \uc5f0\uacb0\uc744 \ud655\uc778\ud569\ub2c8\ub2e4.",
+        "description": "\uc11c\ubc84 \uc5f0\uacb0 \ud655\uc778",
+        "operationId": "read_root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Read Root  Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "\ud5ec\uc2a4\uccb4\ud06c",
+        "description": "\uc11c\ubc84 \ud5ec\uc2a4\uccb4\ud06c",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Check Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/db": {
+      "get": {
+        "summary": "DB \ud5ec\uc2a4\uccb4\ud06c",
+        "description": "DB \uc5f0\uacb0 \uc0c1\ud0dc \ud655\uc778",
+        "operationId": "db_health_check_health_db_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Db Health Check Health Db Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActChangeRequest": {
+        "properties": {
+          "new_act": {
+            "type": "integer",
+            "title": "New Act"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_act"
+        ],
+        "title": "ActChangeRequest"
+      },
+      "ActChangeResult": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "current_phase": {
+            "type": "string",
+            "title": "Current Phase",
+            "default": ""
+          },
+          "current_act": {
+            "type": "integer",
+            "title": "Current Act"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "current_act"
+        ],
+        "title": "ActChangeResult"
+      },
+      "CustomStatus": {
+        "type": "string",
+        "enum": [
+          "success",
+          "error",
+          "warning"
+        ],
+        "title": "CustomStatus",
+        "description": "API \uc751\ub2f5 \uc0c1\ud0dc \ucf54\ub4dc"
+      },
+      "EnemyHPUpdateRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "hp_change": {
+            "type": "integer",
+            "title": "Hp Change"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "hp_change"
+        ],
+        "title": "EnemyHPUpdateRequest",
+        "description": "\uc801 HP \uc5c5\ub370\uc774\ud2b8 \uc694\uccad"
+      },
+      "EnemyHPUpdateResult": {
+        "properties": {
+          "enemy_instance_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Enemy Instance Id"
+          },
+          "current_hp": {
+            "type": "integer",
+            "title": "Current Hp"
+          },
+          "is_defeated": {
+            "type": "boolean",
+            "title": "Is Defeated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enemy_instance_id",
+          "current_hp",
+          "is_defeated"
+        ],
+        "title": "EnemyHPUpdateResult"
+      },
+      "EnemyInfo": {
+        "properties": {
+          "enemy_instance_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Enemy Instance Id"
+          },
+          "scenario_enemy_id": {
+            "type": "string",
+            "title": "Scenario Enemy Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "current_hp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Hp"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "state": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "assigned_sequence_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Sequence Id"
+          },
+          "assigned_location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Location"
+          },
+          "is_defeated": {
+            "type": "boolean",
+            "title": "Is Defeated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "enemy_instance_id",
+          "scenario_enemy_id",
+          "name"
+        ],
+        "title": "EnemyInfo"
+      },
+      "EnemySpawnRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "default": ""
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "state": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "State",
+            "default": {}
+          },
+          "enemy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Enemy Id"
+          },
+          "hp": {
+            "type": "integer",
+            "title": "Hp",
+            "default": 30
+          },
+          "attack": {
+            "type": "integer",
+            "title": "Attack",
+            "default": 10
+          },
+          "defense": {
+            "type": "integer",
+            "title": "Defense",
+            "default": 5
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "enemy_id"
+        ],
+        "title": "EnemySpawnRequest"
+      },
+      "EntityRelationInfo": {
+        "properties": {
+          "from_id": {
+            "type": "string",
+            "title": "From Id"
+          },
+          "from_name": {
+            "type": "string",
+            "title": "From Name"
+          },
+          "to_id": {
+            "type": "string",
+            "title": "To Id"
+          },
+          "to_name": {
+            "type": "string",
+            "title": "To Name"
+          },
+          "relation_type": {
+            "type": "string",
+            "title": "Relation Type"
+          },
+          "affinity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affinity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_id",
+          "from_name",
+          "to_id",
+          "to_name",
+          "relation_type"
+        ],
+        "title": "EntityRelationInfo",
+        "description": "\uc5d4\ud2f0\ud2f0 \uac04 \uad00\uacc4 \uc815\ubcf4 (Apache AGE \uadf8\ub798\ud504 RELATION \uc5e3\uc9c0)"
+      },
+      "FullPlayerState": {
+        "properties": {
+          "player": {
+            "$ref": "#/components/schemas/PlayerStateResponse"
+          },
+          "player_npc_relations": {
+            "items": {
+              "$ref": "#/components/schemas/NPCRelation"
+            },
+            "type": "array",
+            "title": "Player Npc Relations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "player",
+          "player_npc_relations"
+        ],
+        "title": "FullPlayerState"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InventoryItem": {
+        "properties": {
+          "player_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Player Id"
+          },
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "item_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "item_state": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item State"
+          },
+          "acquired_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquired At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "quantity"
+        ],
+        "title": "InventoryItem"
+      },
+      "InventoryUpdateRequest": {
+        "properties": {
+          "player_id": {
+            "type": "string",
+            "title": "Player Id"
+          },
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "player_id",
+          "item_id",
+          "quantity"
+        ],
+        "title": "InventoryUpdateRequest",
+        "description": "\uc778\ubca4\ud1a0\ub9ac \uc5c5\ub370\uc774\ud2b8 \uc694\uccad"
+      },
+      "ItemEarnRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "player_id": {
+            "type": "string",
+            "title": "Player Id"
+          },
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "player_id",
+          "item_id",
+          "quantity"
+        ],
+        "title": "ItemEarnRequest",
+        "description": "\uc544\uc774\ud15c \ud68d\ub4dd \uc694\uccad"
+      },
+      "ItemInfo": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "scenario_item_id": {
+            "type": "string",
+            "title": "Scenario Item Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "item_type": {
+            "type": "string",
+            "title": "Item Type",
+            "default": "misc"
+          },
+          "meta": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "scenario_item_id",
+          "name"
+        ],
+        "title": "ItemInfo"
+      },
+      "ItemUseRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "player_id": {
+            "type": "string",
+            "title": "Player Id"
+          },
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "player_id",
+          "item_id",
+          "quantity"
+        ],
+        "title": "ItemUseRequest",
+        "description": "\uc544\uc774\ud15c \uc0ac\uc6a9 \uc694\uccad"
+      },
+      "LocationUpdateRequest": {
+        "properties": {
+          "new_location": {
+            "type": "string",
+            "title": "New Location"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_location"
+        ],
+        "title": "LocationUpdateRequest",
+        "description": "\uc704\uce58 \uc5c5\ub370\uc774\ud2b8 \uc694\uccad"
+      },
+      "NPCAffinityUpdateRequest": {
+        "properties": {
+          "player_id": {
+            "type": "string",
+            "title": "Player Id"
+          },
+          "npc_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Npc Id"
+          },
+          "affinity_change": {
+            "type": "integer",
+            "title": "Affinity Change"
+          }
+        },
+        "type": "object",
+        "required": [
+          "player_id",
+          "npc_id",
+          "affinity_change"
+        ],
+        "title": "NPCAffinityUpdateRequest",
+        "description": "NPC \ud638\uac10\ub3c4 \uc5c5\ub370\uc774\ud2b8 \uc694\uccad"
+      },
+      "NPCAffinityUpdateResult": {
+        "properties": {
+          "player_id": {
+            "type": "string",
+            "title": "Player Id"
+          },
+          "npc_id": {
+            "type": "string",
+            "title": "Npc Id"
+          },
+          "new_affinity": {
+            "type": "integer",
+            "title": "New Affinity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "player_id",
+          "npc_id",
+          "new_affinity"
+        ],
+        "title": "NPCAffinityUpdateResult"
+      },
+      "NPCInfo": {
+        "properties": {
+          "npc_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Npc Id"
+          },
+          "scenario_npc_id": {
+            "type": "string",
+            "title": "Scenario Npc Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "current_hp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Hp"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "state": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "assigned_sequence_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Sequence Id"
+          },
+          "assigned_location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Location"
+          }
+        },
+        "type": "object",
+        "required": [
+          "npc_id",
+          "scenario_npc_id",
+          "name",
+          "description"
+        ],
+        "title": "NPCInfo"
+      },
+      "NPCRelation": {
+        "properties": {
+          "npc_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Npc Id"
+          },
+          "npc_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Npc Name"
+          },
+          "affinity_score": {
+            "type": "integer",
+            "title": "Affinity Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "npc_id",
+          "affinity_score"
+        ],
+        "title": "NPCRelation"
+      },
+      "NPCSpawnRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "default": ""
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "state": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "State",
+            "default": {}
+          },
+          "npc_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Npc Id"
+          },
+          "hp": {
+            "type": "integer",
+            "title": "Hp",
+            "default": 100
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "npc_id"
+        ],
+        "title": "NPCSpawnRequest"
+      },
+      "PhaseChangeRequest": {
+        "properties": {
+          "new_phase": {
+            "type": "string",
+            "title": "New Phase"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_phase"
+        ],
+        "title": "PhaseChangeRequest"
+      },
+      "PhaseChangeResult": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "current_phase": {
+            "type": "string",
+            "title": "Current Phase"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "current_phase"
+        ],
+        "title": "PhaseChangeResult"
+      },
+      "PlayerHPUpdateRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "hp_change": {
+            "type": "integer",
+            "title": "Hp Change"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": "unknown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "hp_change"
+        ],
+        "title": "PlayerHPUpdateRequest",
+        "description": "\ud50c\ub808\uc774\uc5b4 HP \uc5c5\ub370\uc774\ud2b8 \uc694\uccad"
+      },
+      "PlayerHPUpdateResult": {
+        "properties": {
+          "player_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Player Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "current_hp": {
+            "type": "integer",
+            "title": "Current Hp"
+          },
+          "max_hp": {
+            "type": "integer",
+            "title": "Max Hp"
+          },
+          "hp_change": {
+            "type": "integer",
+            "title": "Hp Change"
+          }
+        },
+        "type": "object",
+        "required": [
+          "player_id",
+          "name",
+          "current_hp",
+          "max_hp",
+          "hp_change"
+        ],
+        "title": "PlayerHPUpdateResult"
+      },
+      "PlayerNPCRelationInfo": {
+        "properties": {
+          "npc_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Npc Id"
+          },
+          "npc_name": {
+            "type": "string",
+            "title": "Npc Name"
+          },
+          "scenario_npc_id": {
+            "type": "string",
+            "title": "Scenario Npc Id"
+          },
+          "affinity_score": {
+            "type": "integer",
+            "title": "Affinity Score"
+          },
+          "relation_type": {
+            "type": "string",
+            "title": "Relation Type"
+          },
+          "interaction_count": {
+            "type": "integer",
+            "title": "Interaction Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "npc_id",
+          "npc_name",
+          "scenario_npc_id",
+          "affinity_score",
+          "relation_type"
+        ],
+        "title": "PlayerNPCRelationInfo",
+        "description": "\ud50c\ub808\uc774\uc5b4-NPC \ud638\uac10\ub3c4 \uad00\uacc4"
+      },
+      "PlayerStateResponse": {
+        "properties": {
+          "hp": {
+            "type": "integer",
+            "title": "Hp"
+          },
+          "gold": {
+            "type": "integer",
+            "title": "Gold"
+          },
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "hp",
+          "gold"
+        ],
+        "title": "PlayerStateResponse"
+      },
+      "PlayerStatsUpdateRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "stat_changes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Stat Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "stat_changes"
+        ],
+        "title": "PlayerStatsUpdateRequest",
+        "description": "\ud50c\ub808\uc774\uc5b4 \uc2a4\ud0ef \uc5c5\ub370\uc774\ud2b8 \uc694\uccad"
+      },
+      "RemoveEntityResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "success"
+          }
+        },
+        "type": "object",
+        "title": "RemoveEntityResult"
+      },
+      "ScenarioActInfo": {
+        "properties": {
+          "scenario_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Scenario Id"
+          },
+          "act_id": {
+            "type": "string",
+            "title": "Act Id"
+          },
+          "act_name": {
+            "type": "string",
+            "title": "Act Name"
+          },
+          "act_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Act Description"
+          },
+          "exit_criteria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Criteria"
+          },
+          "sequence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sequence Ids",
+            "default": []
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "act_id",
+          "act_name"
+        ],
+        "title": "ScenarioActInfo"
+      },
+      "ScenarioActInject": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "\uc561\ud2b8 \uc2dd\ubcc4\uc790 (\uc608: act-1)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "\uc561\ud2b8 \uc774\ub984"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "exit_criteria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Criteria"
+          },
+          "sequences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sequences",
+            "description": "\uc18c\uc18d \uc2dc\ud000\uc2a4 ID \ub9ac\uc2a4\ud2b8"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ScenarioActInject",
+        "description": "\uc2dc\ub098\ub9ac\uc624 \uc8fc\uc785\uc6a9 Act \uc815\ubcf4"
+      },
+      "ScenarioInfo": {
+        "properties": {
+          "scenario_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Scenario Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ScenarioInfo",
+        "description": "\uc870\ud68c\uc6a9 \uc815\ubcf4"
+      },
+      "ScenarioInjectEnemy": {
+        "properties": {
+          "scenario_enemy_id": {
+            "type": "string",
+            "title": "Scenario Enemy Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "state": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "State",
+            "default": {}
+          },
+          "dropped_items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dropped Items",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_enemy_id",
+          "name"
+        ],
+        "title": "ScenarioInjectEnemy",
+        "description": "\uc8fc\uc785\uc6a9 \uc801 \uc815\ubcf4"
+      },
+      "ScenarioInjectItem": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "item_type": {
+            "type": "string",
+            "title": "Item Type",
+            "default": "misc"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "name"
+        ],
+        "title": "ScenarioInjectItem",
+        "description": "\uc8fc\uc785\uc6a9 \uc544\uc774\ud15c \uc815\ubcf4"
+      },
+      "ScenarioInjectNPC": {
+        "properties": {
+          "scenario_npc_id": {
+            "type": "string",
+            "title": "Scenario Npc Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "state": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "State",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_npc_id",
+          "name"
+        ],
+        "title": "ScenarioInjectNPC",
+        "description": "\uc8fc\uc785\uc6a9 NPC \uc815\ubcf4"
+      },
+      "ScenarioInjectRelation": {
+        "properties": {
+          "from_id": {
+            "type": "string",
+            "title": "From Id"
+          },
+          "to_id": {
+            "type": "string",
+            "title": "To Id"
+          },
+          "relation_type": {
+            "type": "string",
+            "title": "Relation Type",
+            "default": "neutral"
+          },
+          "affinity": {
+            "type": "integer",
+            "title": "Affinity",
+            "default": 50
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_id",
+          "to_id"
+        ],
+        "title": "ScenarioInjectRelation",
+        "description": "\uc8fc\uc785\uc6a9 \uad00\uacc4 \uc815\ubcf4"
+      },
+      "ScenarioInjectRequest": {
+        "properties": {
+          "scenario_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "acts": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioActInject"
+            },
+            "type": "array",
+            "title": "Acts",
+            "default": []
+          },
+          "sequences": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioSequenceInject"
+            },
+            "type": "array",
+            "title": "Sequences",
+            "default": []
+          },
+          "npcs": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioInjectNPC"
+            },
+            "type": "array",
+            "title": "Npcs",
+            "default": []
+          },
+          "enemies": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioInjectEnemy"
+            },
+            "type": "array",
+            "title": "Enemies",
+            "default": []
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioInjectItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          },
+          "relations": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioInjectRelation"
+            },
+            "type": "array",
+            "title": "Relations",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "ScenarioInjectRequest",
+        "description": "\ucd5c\uc885 \uc2dc\ub098\ub9ac\uc624 \uc8fc\uc785 \uaddc\uaca9"
+      },
+      "ScenarioInjectResponse": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Scenario structure injected successfully"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "title"
+        ],
+        "title": "ScenarioInjectResponse",
+        "description": "\uc8fc\uc785 \uc751\ub2f5"
+      },
+      "ScenarioSequenceInject": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "\uc2dc\ud000\uc2a4 \uc2dd\ubcc4\uc790 (\uc608: seq-1)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "\uc2dc\ud000\uc2a4 \uc774\ub984"
+          },
+          "location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal"
+          },
+          "exit_triggers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exit Triggers",
+            "description": "\ud0c8\ucd9c/\uc804\ud658 \uc870\uac74"
+          },
+          "npcs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Npcs",
+            "description": "\uc18c\uc18d NPC ID \ub9ac\uc2a4\ud2b8"
+          },
+          "enemies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Enemies",
+            "description": "\uc18c\uc18d \uc801 ID \ub9ac\uc2a4\ud2b8"
+          },
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "\uc18c\uc18d \uc544\uc774\ud15c ID \ub9ac\uc2a4\ud2b8"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ScenarioSequenceInject",
+        "description": "\uc2dc\ub098\ub9ac\uc624 \uc8fc\uc785\uc6a9 Sequence \uc815\ubcf4"
+      },
+      "SequenceChangeRequest": {
+        "properties": {
+          "new_sequence": {
+            "type": "integer",
+            "title": "New Sequence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_sequence"
+        ],
+        "title": "SequenceChangeRequest"
+      },
+      "SequenceChangeResult": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "current_sequence": {
+            "type": "integer",
+            "title": "Current Sequence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "current_sequence"
+        ],
+        "title": "SequenceChangeResult"
+      },
+      "SequenceDetailInfo": {
+        "properties": {
+          "scenario_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Scenario Id"
+          },
+          "sequence_id": {
+            "type": "string",
+            "title": "Sequence Id"
+          },
+          "sequence_name": {
+            "type": "string",
+            "title": "Sequence Name"
+          },
+          "location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal"
+          },
+          "exit_triggers": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Exit Triggers",
+            "default": []
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata",
+            "default": {}
+          },
+          "npcs": {
+            "items": {
+              "$ref": "#/components/schemas/SequenceEntityInfo"
+            },
+            "type": "array",
+            "title": "Npcs",
+            "default": []
+          },
+          "enemies": {
+            "items": {
+              "$ref": "#/components/schemas/SequenceEntityInfo"
+            },
+            "type": "array",
+            "title": "Enemies",
+            "default": []
+          },
+          "entity_relations": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRelationInfo"
+            },
+            "type": "array",
+            "title": "Entity Relations",
+            "default": []
+          },
+          "player_npc_relations": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerNPCRelationInfo"
+            },
+            "type": "array",
+            "title": "Player Npc Relations",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "sequence_id",
+          "sequence_name"
+        ],
+        "title": "SequenceDetailInfo",
+        "description": "\uc2dc\ud000\uc2a4 \uc0c1\uc138 \uc815\ubcf4 (\uc5d4\ud2f0\ud2f0 \ubc0f \uad00\uacc4 \ud3ec\ud568)"
+      },
+      "SequenceEntityInfo": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Id"
+          },
+          "scenario_entity_id": {
+            "type": "string",
+            "title": "Scenario Entity Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "state": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "is_defeated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Defeated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "scenario_entity_id",
+          "name",
+          "entity_type"
+        ],
+        "title": "SequenceEntityInfo",
+        "description": "\uc2dc\ud000\uc2a4 \ub0b4 \uc5d4\ud2f0\ud2f0 \uc694\uc57d \uc815\ubcf4"
+      },
+      "SessionInfo": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "scenario_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Scenario Id"
+          },
+          "player_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Player Id"
+          },
+          "current_act": {
+            "type": "integer",
+            "title": "Current Act"
+          },
+          "current_sequence": {
+            "type": "integer",
+            "title": "Current Sequence"
+          },
+          "current_act_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Act Id",
+            "default": "act-1"
+          },
+          "current_sequence_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Sequence Id",
+            "default": "seq-1"
+          },
+          "current_phase": {
+            "type": "string",
+            "title": "Current Phase",
+            "default": "exploration"
+          },
+          "current_turn": {
+            "type": "integer",
+            "title": "Current Turn",
+            "default": 1
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "scenario_id",
+          "current_act",
+          "current_sequence",
+          "status"
+        ],
+        "title": "SessionInfo"
+      },
+      "SessionStartRequest": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id",
+            "description": "\uc2dc\ub098\ub9ac\uc624 UUID"
+          },
+          "current_act": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Current Act",
+            "description": "\uc2dc\uc791 Act",
+            "default": 1
+          },
+          "current_sequence": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Current Sequence",
+            "description": "\uc2dc\uc791 Sequence",
+            "default": 1
+          },
+          "location": {
+            "type": "string",
+            "title": "Location",
+            "description": "\uc2dc\uc791 \uc704\uce58",
+            "default": "Starting Town"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id"
+        ],
+        "title": "SessionStartRequest",
+        "description": "\uc138\uc158 \uc2dc\uc791 \uc694\uccad",
+        "example": {
+          "current_act": 1,
+          "current_sequence": 1,
+          "location": "Starting Town",
+          "scenario_id": "550e8400-e29b-41d4-a716-446655440000"
+        }
+      },
+      "SpawnResult": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SpawnResult"
+      },
+      "TurnAddResult": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "uuid"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "current_turn": {
+            "type": "integer",
+            "title": "Current Turn"
+          },
+          "phase_at_turn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase At Turn"
+          },
+          "turn_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Type"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "current_turn"
+        ],
+        "title": "TurnAddResult"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WrappedResponse_ActChangeResult_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ActChangeResult"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[ActChangeResult]"
+      },
+      "WrappedResponse_Any_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[Any]"
+      },
+      "WrappedResponse_Dict_str__Any__": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[Dict[str, Any]]"
+      },
+      "WrappedResponse_Dict_str__str__": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[Dict[str, str]]"
+      },
+      "WrappedResponse_EnemyHPUpdateResult_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EnemyHPUpdateResult"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[EnemyHPUpdateResult]"
+      },
+      "WrappedResponse_FullPlayerState_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/FullPlayerState"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[FullPlayerState]"
+      },
+      "WrappedResponse_List_Dict_str__Any___": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[List[Dict[str, Any]]]"
+      },
+      "WrappedResponse_List_EnemyInfo__": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/EnemyInfo"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[List[EnemyInfo]]"
+      },
+      "WrappedResponse_List_InventoryItem__": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryItem"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[List[InventoryItem]]"
+      },
+      "WrappedResponse_List_ItemInfo__": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ItemInfo"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[List[ItemInfo]]"
+      },
+      "WrappedResponse_List_NPCInfo__": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/NPCInfo"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[List[NPCInfo]]"
+      },
+      "WrappedResponse_List_ScenarioInfo__": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioInfo"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[List[ScenarioInfo]]"
+      },
+      "WrappedResponse_List_SessionInfo__": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SessionInfo"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[List[SessionInfo]]"
+      },
+      "WrappedResponse_NPCAffinityUpdateResult_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/NPCAffinityUpdateResult"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[NPCAffinityUpdateResult]"
+      },
+      "WrappedResponse_PhaseChangeResult_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PhaseChangeResult"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[PhaseChangeResult]"
+      },
+      "WrappedResponse_PlayerHPUpdateResult_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PlayerHPUpdateResult"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[PlayerHPUpdateResult]"
+      },
+      "WrappedResponse_RemoveEntityResult_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RemoveEntityResult"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[RemoveEntityResult]"
+      },
+      "WrappedResponse_ScenarioActInfo_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ScenarioActInfo"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[ScenarioActInfo]"
+      },
+      "WrappedResponse_ScenarioInfo_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ScenarioInfo"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[ScenarioInfo]"
+      },
+      "WrappedResponse_ScenarioInjectResponse_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ScenarioInjectResponse"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[ScenarioInjectResponse]"
+      },
+      "WrappedResponse_SequenceChangeResult_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SequenceChangeResult"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[SequenceChangeResult]"
+      },
+      "WrappedResponse_SequenceDetailInfo_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SequenceDetailInfo"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[SequenceDetailInfo]"
+      },
+      "WrappedResponse_SessionInfo_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SessionInfo"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[SessionInfo]"
+      },
+      "WrappedResponse_SpawnResult_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SpawnResult"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[SpawnResult]"
+      },
+      "WrappedResponse_TurnAddResult_": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TurnAddResult"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[TurnAddResult]"
+      },
+      "WrappedResponse_Union_Dict_str__Any___NoneType__": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CustomStatus",
+            "default": "success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "WrappedResponse[Union[Dict[str, Any], NoneType]]"
+      }
+    }
+  }
+}

@@ -1,0 +1,87 @@
+import asyncio
+import logging
+import os
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Dict
+
+from fastapi import FastAPI, Request
+from tenacity import retry, stop_after_attempt, wait_fixed
+
+from gm.api.v1.api import api_router
+from gm.core.config import settings
+from gm.infra.db.database import DatabaseHandler
+from gm.infra.db.init_db import init_db
+
+# Setup logging to use uvicorn's logger configuration
+logger = logging.getLogger("uvicorn.error")
+gm_logger = logging.getLogger("gm")
+gm_logger.setLevel(logging.INFO)
+for handler in logger.handlers:
+    gm_logger.addHandler(handler)
+
+
+@retry(stop=stop_after_attempt(5), wait=wait_fixed(2), reraise=True)
+async def connect_and_init_db(db: DatabaseHandler) -> None:
+    """Initialize database connection and schema with retries."""
+    try:
+        logger.info(
+            "Attempting to connect to database at: %s:%s",
+            settings.DB_HOST,
+            settings.DB_PORT,
+        )
+        await asyncio.wait_for(db.connect(), timeout=5.0)
+        await init_db(db)
+        logger.info(f"Connected to database and initialized schema: {settings.DB_NAME}")
+    except Exception as e:
+        logger.error(
+            f"Database connection attempt failed. DSN used: {settings.database_dsn}\n"
+            f"Error: {str(e)}"
+        )
+        raise e
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # Initialize infrastructure
+    db = DatabaseHandler(settings.real_database_dsn)
+
+    # Load SQL queries
+    queries_dir = os.path.join(os.path.dirname(__file__), "infra", "db", "queries")
+    db.load_queries(queries_dir)
+
+    app.state.db = db
+
+    # Background initialization
+    asyncio.create_task(connect_and_init_db(db))
+
+    logger.info(f"Server starting... Swagger UI: http://localhost:{settings.PORT}/docs")
+    yield
+
+    # Clean up
+    await db.close()
+    logger.info("Database connection closed.")
+
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    lifespan=lifespan,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+)
+
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+@app.get("/")
+async def root() -> Dict[str, str]:
+    return {"message": "GM Core Service is running"}
+
+
+@app.get("/health")
+async def health_check(request: Request) -> Dict[str, str]:
+    db: DatabaseHandler = request.app.state.db
+    try:
+        await db.fetchval("SELECT 1")
+        return {"status": "ok", "db": "connected"}
+    except Exception as e:
+        return {"status": "error", "db": str(e)}

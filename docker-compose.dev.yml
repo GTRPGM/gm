@@ -1,0 +1,75 @@
+services:
+  gm-core:
+    container_name: gm-core
+    build: .
+    ports:
+      - "8020:8020"
+    environment:
+      - DB_HOST=postgres-db
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+      - STATE_MANAGER_HOST=mock-services
+      - STATE_MANAGER_PORT=8000
+      - SCENARIO_SERVICE_HOST=mock-services
+      - SCENARIO_SERVICE_PORT=8000
+      - RULE_ENGINE_HOST=mock-services
+      - RULE_ENGINE_PORT=8000
+      - LLM_GATEWAY_HOST=mock-services
+      - LLM_GATEWAY_PORT=8000
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      mock-services:
+        condition: service_healthy
+    networks:
+      - gm-network
+
+  mock-services:
+    container_name: mock-services
+    build: ./mock_services
+    ports:
+      - "8130:8000"
+      - "8140:8000"
+      - "8150:8000"
+      - "8160:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    networks:
+      - gm-network
+
+  postgres-db:
+    container_name: postgres-db
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - gm-network
+
+networks:
+  gm-network:
+    name: gm-network
+    driver: bridge
+
+volumes:
+  postgres_data:

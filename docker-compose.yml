@@ -1,0 +1,35 @@
+services:
+  gm:
+    image: ${IMAGE_NAME}
+    container_name: gm
+    restart: unless-stopped
+
+    ports:
+      - "0.0.0.0:${PORT:-8020}:${PORT-8020}"
+
+    environment:
+      PORT: ${PORT:-8020}
+
+      # Database Settings
+      DB_USER: "${DB_USER}"
+      DB_PASSWORD: "${DB_PASSWORD}"
+      DB_HOST: "${DB_HOST}"
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_NAME: "${DB_NAME}"
+
+      # External Service URLs
+      STATE_MANAGER_URL: ${STATE_MANAGER_URL}
+      SCENARIO_SERVICE_URL: ${SCENARIO_SERVICE_URL}
+      RULE_ENGINE_URL: ${RULE_ENGINE_URL}
+      LLM_GATEWAY_URL: ${LLM_GATEWAY_URL}
+
+      # LLM Settings
+      LLM_MODEL_NAME: "${LLM_MODEL_NAME:-gemini-2.5-flash-lite}"
+
+    networks:
+      - platform-net
+
+networks:
+  platform-net:
+    name: platform-net
+    external: true

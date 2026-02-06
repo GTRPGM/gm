@@ -1,0 +1,7 @@
+현재 시퀀스 유형: {sequence_type}
+활성 엔티티 목록: {entity_list}
+
+최근 이력:
+{history}
+
+다음에 행동할 주체는 누구입니까?

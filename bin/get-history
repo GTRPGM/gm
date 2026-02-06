@@ -1,0 +1,14 @@
+#!/bin/bash
+set -e
+
+SESSION_ID=${1:-"korean_simulation_v4"}
+BASE_URL=${2:-"http://localhost:8020"}
+
+if [ -z "$SESSION_ID" ]; then
+    echo "Usage: $0 [SESSION_ID] [BASE_URL]"
+    exit 1
+fi
+
+echo "📜 Fetching history for session: $SESSION_ID from $BASE_URL..."
+
+curl -s -f "$BASE_URL/api/v1/game/history/$SESSION_ID" | python3 -c "import sys, json; print(json.dumps(json.load(sys.stdin), indent=2, ensure_ascii=False))"
