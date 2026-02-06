@@ -1,2 +1,14 @@
+[최근 대화 내역]
+{history}
+
+[현재 정보(World Snapshot)]
+{world_snapshot}
+
+[정합성 규칙]
+- 위 World Snapshot에 없는 장소/NPC/적/아이템을 새로 만들지 마십시오.
+- 아이템 획득/소지/사용 서술은 World Snapshot에 해당 아이템이 있을 때만 허용됩니다.
+- 현재 시퀀스/목표와 무관한 전개(갑작스러운 장소 전환, 외부 세계 도약)를 금지합니다.
+
 입력: {input_text}
 판정 결과: {outcome}
+{required_narrative_instruction}

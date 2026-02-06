@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, List
 
-from gm.core.models.rule import RuleOutcome
-from gm.core.models.scenario import ScenarioSuggestion
-from gm.core.models.state import EntityDiff
+from gm.schemas.common import EntityDiff
+from gm.schemas.rule_engine import RuleOutcome
+from gm.schemas.scenario import ScenarioSuggestion
 
 
 class RuleManagerPort(ABC):
@@ -28,7 +28,7 @@ class ScenarioManagerPort(ABC):
 
 class StateManagerPort(ABC):
     @abstractmethod
-    async def commit(self, turn_id: str, diffs: list[EntityDiff]) -> Dict[str, Any]:
+    async def commit(self, turn_id: str, diffs: List[EntityDiff]) -> Dict[str, Any]:
         pass
 
     @abstractmethod
@@ -37,12 +37,19 @@ class StateManagerPort(ABC):
         pass
 
     @abstractmethod
+    async def get_act_details(self, session_id: str) -> Dict[str, Any]:
+        """Fetch detailed act information."""
+        pass
+
+    @abstractmethod
     async def get_sequence_details(self, session_id: str) -> Dict[str, Any]:
         """Fetch detailed sequence information including NPCs and enemies."""
         pass
 
     @abstractmethod
-    async def update_act(self, session_id: str, act_id: str) -> Dict[str, Any]:
+    async def update_act(
+        self, session_id: str, act_id: str, seq_id: str
+    ) -> Dict[str, Any]:
         """Update session's current act."""
         pass
 

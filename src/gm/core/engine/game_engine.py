@@ -8,8 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from gm.core.models.context import TurnContext
-from gm.core.models.state import EntityDiff
+from gm.core.models import TurnContext
 from gm.exceptions import PipelineError
 from gm.infra.db.database import DatabaseHandler
 from gm.interfaces.external import (
@@ -18,6 +17,7 @@ from gm.interfaces.external import (
     StateManagerPort,
 )
 from gm.interfaces.llm import LLMPort
+from gm.schemas.common import EntityDiff
 
 logger = logging.getLogger(__name__)
 
@@ -117,13 +117,22 @@ class GameEngine:
             "turn_id": player_result_state["turn_id"],
             "narrative": player_result_state["narrative"],
             "commit_id": player_result_state["commit_id"],
+            "active_entity_id": player_result_state.get("active_entity_id", "player"),
+            "is_npc_turn": False,
         }
 
-        # 2. Automatically Process NPC Turn
-        npc_response = await self.process_npc_turn(user_input.session_id)
+        # 2. Check if there are active entities (NPCs/Enemies)
+        snapshot = player_result_state.get("world_snapshot", {})
+        entities = snapshot.get("entities", [])
 
-        # 3. Return Combined Result
-        player_response["npc_turn"] = npc_response
+        # 3. Process NPC Turn only if entities exist
+        if entities:
+            logger.info(f"Active entities found: {entities}. Proceeding to NPC turn.")
+            npc_response = await self.process_npc_turn(user_input.session_id)
+            player_response["npc_turn"] = npc_response
+        else:
+            logger.info("No active entities found. Skipping NPC turn.")
+            player_response["npc_turn"] = None
 
         return player_response
 
@@ -133,13 +142,9 @@ class GameEngine:
             "session_id": session_id,
             "user_input": "",  # 그래프 내부에서 생성될 예정
             "is_npc_turn": True,
-            # Context defaults
-            "active_entity_id": "npc_pending",  # Will be decided in graph
-            "act_id": "act-1",
-            "sequence_id": "seq-1",
-            "sequence_type": "COMBAT",
-            "sequence_seq": 1,
-            # world_snapshot will be loaded by fetch_state node
+            # Context defaults (will be overridden by fetch_state)
+            "active_entity_id": "npc_pending",
+            "sequence_type": "EXPLORATION",
         }
 
         # 그래프 비동기 실행
@@ -175,45 +180,52 @@ class GameEngine:
     @log_node_execution
     async def fetch_state(self, state: TurnContext) -> TurnContext:
         """Fetch latest world state from State Manager."""
+        session_id = state["session_id"]
         try:
-            session_id = state["session_id"]
-            # 1. Session Info (player_id, phase, turn 등)
             snapshot = await self.state_client.get_state(session_id)
-
-            # 2. Sequence Details (NPCs, Enemies, Relations 등)
-            details = await self.state_client.get_sequence_details(session_id)
-
-            # 3. Fetch all sequences for the current act (for scenario jump logic)
-            # This is currently missing in the Snapshot but important
-            # for Scenario Service
-            # For now, we assume Scenario Service has its own scenario DB,
-            # but GM could provide 'available_sequences' if needed.
-
-            snapshot.update(details)
-
-            entities = []
-            for npc in snapshot.get("npcs", []):
-                entities.append(npc.get("scenario_entity_id"))
-            for enemy in snapshot.get("enemies", []):
-                entities.append(enemy.get("scenario_entity_id"))
-
-            snapshot["entities"] = entities
-
-            count = len(snapshot.get("npcs", [])) + len(snapshot.get("enemies", []))
-            logger.info(f"   -> Fetched State Snapshot with {count} entities")
-            return {
-                "world_snapshot": snapshot,
-                "act_id": snapshot.get("current_act_id") or state.get("act_id"),
-                "sequence_id": snapshot.get("current_sequence_id")
-                or state.get("sequence_id"),
-                "sequence_type": snapshot.get("current_phase")
-                or state.get("sequence_type"),
-                "sequence_seq": snapshot.get("current_turn")
-                or state.get("sequence_seq"),
-            }
         except Exception as e:
-            logger.error(f"Failed to fetch state: {e}")
+            logger.error(f"Failed to fetch base session state: {e}")
             return {}
+
+        # sequence/details가 일시 실패해도 base session state는 유지한다.
+        try:
+            details = await self.state_client.get_sequence_details(session_id)
+            snapshot.update(details)
+        except Exception as e:
+            logger.warning(f"Failed to fetch sequence details (continue): {e}")
+            snapshot.setdefault("npcs", [])
+            snapshot.setdefault("enemies", [])
+            snapshot.setdefault("entity_relations", [])
+            snapshot.setdefault("player_npc_relations", [])
+
+        try:
+            act_details = await self.state_client.get_act_details(session_id)
+            snapshot["act"] = act_details
+        except Exception as e:
+            logger.warning(f"Failed to fetch act details (continue): {e}")
+            snapshot.setdefault("act", {})
+
+        entities = []
+        for npc in snapshot.get("npcs", []):
+            entities.append(npc.get("scenario_entity_id"))
+        for enemy in snapshot.get("enemies", []):
+            entities.append(enemy.get("scenario_entity_id"))
+        snapshot["entities"] = entities
+
+        logger.info(
+            f"   -> Fetched Snapshot Scenario ID: {snapshot.get('scenario_id')}"
+        )
+
+        return {
+            "world_snapshot": snapshot,
+            "scenario_id": snapshot.get("scenario_id") or state.get("scenario_id"),
+            "act_id": snapshot.get("current_act_id") or state.get("act_id"),
+            "sequence_id": snapshot.get("current_sequence_id")
+            or state.get("sequence_id"),
+            "sequence_type": snapshot.get("current_phase")
+            or state.get("sequence_type"),
+            "sequence_seq": snapshot.get("current_turn") or state.get("sequence_seq"),
+        }
 
     def _load_prompt(self, relative_path: str) -> str:
         """Load a prompt template from a file."""
@@ -267,6 +279,7 @@ class GameEngine:
                 {
                     "entity_list": entity_list_str,
                     "history": history,
+                    "sequence_type": state.get("sequence_type", "EXPLORATION"),
                 }
             )
             selected_entity = response_msg.content.strip().lower()
@@ -323,6 +336,7 @@ class GameEngine:
                     "goal": goal,
                     "exit_triggers": exit_triggers,
                     "actor": actor,
+                    "sequence_type": state.get("sequence_type", "EXPLORATION"),
                 }
             )
             npc_action_text = response_msg.content
@@ -352,23 +366,33 @@ class GameEngine:
     @log_node_execution
     async def check_rule(self, state: TurnContext) -> TurnContext:
         """Call Rule Manager. Skip for Narrator."""
+        from gm.schemas.rule_engine import RuleOutcome
+
         active_entity = state.get("active_entity_id", "player")
         if active_entity.lower() == "narrator":
-            from gm.core.models.rule import RuleOutcome
-
             logger.info("   -> Actor is Narrator. Skipping Rule Check.")
             # Return a default success outcome for narrator
             return {
                 "rule_outcome": RuleOutcome(
                     session_id=state.get("session_id", "unknown"),
-                    scenario_id=state.get("scenario_id", "1"),
+                    scenario_id=state.get("scenario_id", "unknown"),
                     success=True,
                     reason="나레이터의 서술입니다.",
                     suggested={"diffs": [], "relations": []},
                 )
             }
 
-        proposal = await self.rule_client.get_proposal(state)
+        try:
+            proposal = await self.rule_client.get_proposal(state)
+        except Exception as e:
+            logger.warning("rule_engine_unavailable_fallback error=%s", type(e).__name__)
+            proposal = RuleOutcome(
+                session_id=state.get("session_id", "unknown"),
+                scenario_id=state.get("scenario_id", "unknown"),
+                success=True,
+                reason="룰 엔진 오류로 기본 판정을 적용합니다.",
+                suggested={"diffs": [], "relations": []},
+            )
         return {"rule_outcome": proposal}
 
     @log_node_execution
@@ -448,9 +472,13 @@ class GameEngine:
         scenario = state.get("scenario_suggestion")
         if scenario:
             if scenario.next_act_id:
+                if not scenario.next_seq_id:
+                    raise ValueError(
+                        "Scenario transition mismatch: next_seq_id is required when next_act_id is set"
+                    )
                 logger.info(f"   -> Transitioning to ACT: {scenario.next_act_id}")
                 await self.state_client.update_act(
-                    state["session_id"], scenario.next_act_id
+                    state["session_id"], scenario.next_act_id, scenario.next_seq_id
                 )
             elif scenario.next_seq_id:
                 logger.info(f"   -> Transitioning to SEQUENCE: {scenario.next_seq_id}")
@@ -495,14 +523,57 @@ class GameEngine:
 
         chain = prompt | self.llm
 
+        # Fetch history for context
+        history = await self._fetch_history(state["session_id"], limit=5)
         narrative = ""
+        required_narrative_instruction = (
+            (
+                "\n[필수 포함 내용]"
+                "\n다음 문장을 서술의 마지막이나 적절한 위치에 "
+                f"'토씨 하나 틀리지 말고' 그대로 포함하십시오:\n{required_slot}"
+            )
+            if required_slot
+            else ""
+        )
+
         for _ in range(max_retries):
-            response_msg = await chain.ainvoke(
-                {
+            try:
+                snapshot = state.get("world_snapshot", {}) or {}
+                snapshot_view = {
+                    "scenario_id": snapshot.get("scenario_id"),
+                    "current_act_id": snapshot.get("current_act_id"),
+                    "current_sequence_id": snapshot.get("current_sequence_id"),
+                    "sequence_name": snapshot.get("sequence_name"),
+                    "location_name": snapshot.get("location_name"),
+                    "goal": snapshot.get("goal"),
+                    "exit_triggers": snapshot.get("exit_triggers", []),
+                    "npcs": [
+                        {"id": n.get("scenario_entity_id"), "name": n.get("name")}
+                        for n in snapshot.get("npcs", [])
+                    ],
+                    "enemies": [
+                        {"id": e.get("scenario_entity_id"), "name": e.get("name")}
+                        for e in snapshot.get("enemies", [])
+                    ],
+                    "items": [
+                        {"id": i.get("scenario_item_id"), "name": i.get("name")}
+                        for i in snapshot.get("items", [])
+                    ],
+                }
+                context = {
                     "input_text": state["user_input"],
                     "outcome": rule_outcome.model_dump(),
+                    "required_narrative_instruction": required_narrative_instruction,
+                    "history": history,
+                    "active_entity_id": active_entity,
+                    "world_snapshot": json.dumps(
+                        snapshot_view, ensure_ascii=False
+                    ),
                 }
-            )
+                response_msg = await chain.ainvoke(context)
+            except Exception as e:
+                logger.exception("Error during narrative generation ainvoke")
+                raise e
             narrative = response_msg.content
 
             if required_slot and required_slot not in narrative:
@@ -540,6 +611,74 @@ class GameEngine:
             logger.error(f"Failed to save log: {e}")
 
         return {}
+
+    async def generate_summary(self, session_id: str) -> str:
+        """
+        Generates a situational briefing for the player
+        based on current state and history.
+        Used for opening scenes or session resumption.
+        """
+        # 1. Fetch State (Reuse logic manually or call client directly)
+        try:
+            snapshot = await self.state_client.get_state(session_id)
+            details = await self.state_client.get_sequence_details(session_id)
+            act_details = await self.state_client.get_act_details(session_id)
+            snapshot.update(details)
+            snapshot["act"] = act_details
+
+            # Entities list string
+            entities = []
+            for npc in snapshot.get("npcs", []):
+                name = npc.get("name", "Unknown")
+                desc = npc.get("description", "")[:30]
+                entities.append(f"{name}({desc})")
+            for enemy in snapshot.get("enemies", []):
+                name = enemy.get("name", "Unknown")
+                desc = enemy.get("description", "")[:30]
+                entities.append(f"{name}({desc})")
+
+            entity_str = ", ".join(entities) if entities else "없음"
+
+        except Exception as e:
+            logger.error(f"Failed to fetch state for summary: {e}")
+            return "현재 상황을 파악할 수 없습니다."
+
+        # 2. Fetch History
+        history = await self._fetch_history(session_id, limit=5)
+        history_text = "\n".join(
+            [f"- {h['player']} -> {h['narrative']}" for h in history]
+        )
+        if not history_text:
+            history_text = "(기록 없음 - 게임 시작)"
+
+        # 3. Load Prompts
+        system_instruction = self._load_prompt("generate_summary/system.txt")
+        user_prompt = self._load_prompt("generate_summary/user.txt")
+
+        # 4. LLM Generation
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_instruction),
+                ("user", user_prompt),
+            ]
+        )
+        chain = prompt | self.llm
+
+        try:
+            response_msg = await chain.ainvoke(
+                {
+                    "act_name": snapshot.get("act", {}).get("act_name", "Unknown"),
+                    "sequence_name": snapshot.get("sequence_name", "Unknown"),
+                    "goal": snapshot.get("goal", "생존"),
+                    "entities": entity_str,
+                    "player_hp": snapshot.get("player", {}).get("hp", "?"),
+                    "history": history_text,
+                }
+            )
+            return response_msg.content
+        except Exception as e:
+            logger.error(f"Summary generation failed: {e}")
+            return "상황 요약을 생성하는 도중 오류가 발생했습니다."
 
     def _build_graph(self) -> CompiledStateGraph:
         workflow = StateGraph(TurnContext)

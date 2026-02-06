@@ -1,3 +1,5 @@
+import logging
+import re
 from typing import Any, Dict
 
 import httpx
@@ -9,17 +11,37 @@ from tenacity import (
 )
 
 from gm.core.config import settings
-from gm.core.models.rule import (
+from gm.schemas.common import EntityDiff
+from gm.schemas.rule_engine import (
     RuleOutcome,
     RuleRequestEntity,
 )
-from gm.core.models.scenario import ScenarioSuggestion
-from gm.core.models.state import EntityDiff
+from gm.schemas.scenario import ScenarioSuggestion
 from gm.interfaces.external import (
     RuleManagerPort,
     ScenarioManagerPort,
     StateManagerPort,
 )
+
+logger = logging.getLogger(__name__)
+ACT_ID_RE = re.compile(r"^act-\d+(?:-\d+)*$")
+SEQ_ID_RE = re.compile(r"^seq-\d+(?:-\d+)*$")
+
+
+def _unwrap_response_data(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Support both wrapped({status,data}) and flat response bodies."""
+    if not isinstance(payload, dict):
+        return {}
+    if isinstance(payload.get("data"), dict):
+        return payload["data"]
+    return payload
+
+
+def _normalize_hierarchy_id(raw: Any, pattern: re.Pattern[str], default: str) -> str:
+    value = str(raw or "").strip()
+    if pattern.match(value):
+        return value
+    return default
 
 # 기본 재시도 설정: 예외 발생 시 최대 3회 시도, 지수 백오프 적용 (최소 0.1초, 최대 2초)
 retry_policy = retry(
@@ -52,7 +74,6 @@ class RuleManagerHTTPClient(RuleManagerPort):
     @retry_policy
     async def get_proposal(self, context: Dict[str, Any]) -> RuleOutcome:
         url = f"{settings.RULE_ENGINE_URL}/play/scenario"
-        print(f"DEBUG: Requesting Rule Check at {url}")
 
         # Construct payload from context
         session_id = str(context.get("session_id", ""))
@@ -146,14 +167,12 @@ class RuleManagerHTTPClient(RuleManagerPort):
             from_s_id = master_to_instance.get(from_m_id, from_m_id)
             to_s_id = master_to_instance.get(to_m_id, to_m_id)
 
-            req_relations.append(
-                {
-                    "cause_entity_id": str(from_s_id),
-                    "effect_entity_id": str(to_s_id),
-                    "type": mapped_type,
-                    "affinity_score": rel.get("affinity"),
-                }
-            )
+            req_relations.append({
+                "cause_entity_id": str(from_s_id),
+                "effect_entity_id": str(to_s_id),
+                "type": mapped_type,
+                "affinity_score": rel.get("affinity"),
+            })
 
         for rel in snapshot.get("player_npc_relations", []):
             if player_id:
@@ -161,26 +180,26 @@ class RuleManagerHTTPClient(RuleManagerPort):
                 mapped_type = self.RELATION_MAP.get(r_type, "중립적")
                 npc_s_id = str(rel.get("npc_id"))
 
-                req_relations.append(
-                    {
-                        "cause_entity_id": str(player_id),
-                        "effect_entity_id": npc_s_id,
-                        "type": mapped_type,
-                        "affinity_score": rel.get("affinity_score"),
-                    }
-                )
-
-                # Rule Engine might need bidirectional relations?
-                # Usually affinity is mutual, stick to one for now.
+                req_relations.append({
+                    "cause_entity_id": str(player_id),
+                    "effect_entity_id": npc_s_id,
+                    "type": mapped_type,
+                    "affinity_score": rel.get("affinity_score"),
+                })
 
         # Scenario and Locale
-        scenario_id = str(snapshot.get("scenario_id", context.get("scenario_id", "1")))
+        scenario_id = str(
+            context.get("scenario_id")
+            or snapshot.get("scenario_id")
+            or "unknown"
+        )
         locale_id = int(context.get("locale_id", 0))
 
         payload = {
             "session_id": session_id,
             "scenario_id": scenario_id,
             "locale_id": locale_id,
+            "actor_id": active_entity_id,
             "entities": [e.model_dump() for e in req_entities],
             "relations": req_relations,
             "story": user_input,
@@ -188,19 +207,17 @@ class RuleManagerHTTPClient(RuleManagerPort):
 
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(url, json=payload, timeout=10.0)
-                if response.status_code == 422:
-                    print(f"DEBUG: 422 Detail: {response.text}")
+                response = await client.post(url, json=payload, timeout=15.0)
                 response.raise_for_status()
-
-                # Rule Engine returns WrappedResponse[PlaySceneResponse]
-                resp_json = response.json()
-                data = resp_json.get("data", {})
-
+                data = _unwrap_response_data(response.json())
                 return RuleOutcome(**data)
-
         except Exception as e:
-            print(f"DEBUG: Rule Check Failed: {e}")
+            logger.error(
+                "rule_client_error session_id=%s scenario_id=%s error=%s",
+                session_id,
+                scenario_id,
+                type(e).__name__,
+            )
             raise e
 
     async def check_health(self) -> bool:
@@ -216,25 +233,31 @@ class RuleManagerHTTPClient(RuleManagerPort):
 class ScenarioManagerHTTPClient(ScenarioManagerPort):
     @retry_policy
     async def get_proposal(self, context: Dict[str, Any]) -> ScenarioSuggestion:
-        # Use validate endpoint to avoid 404 on session lookup
         url = f"{settings.SCENARIO_SERVICE_URL}/api/v1/check/validate"
 
         rule_outcome = context.get("rule_outcome")
         if not rule_outcome:
             raise ValueError("Rule outcome missing in context")
 
-        # Snapshot or context should have current progress
         snapshot = context.get("world_snapshot", {})
 
-        # Priority: Snapshot (Real DB State) > Context > Rule Outcome > Default
+        # Priority: Context > Snapshot (Real DB State) > Rule Outcome
         scenario_id = str(
-            snapshot.get("scenario_id")
-            or context.get("scenario_id")
+            context.get("scenario_id")
+            or snapshot.get("scenario_id")
             or rule_outcome.scenario_id
+            or "unknown"
         )
-        act_id = str(snapshot.get("current_act_id") or context.get("act_id") or "act-1")
-        seq_id = str(
-            snapshot.get("current_sequence_id") or context.get("sequence_id") or "seq-1"
+
+        act_id = _normalize_hierarchy_id(
+            snapshot.get("current_act_id") or context.get("act_id"),
+            ACT_ID_RE,
+            "act-1",
+        )
+        seq_id = _normalize_hierarchy_id(
+            snapshot.get("current_sequence_id") or context.get("sequence_id"),
+            SEQ_ID_RE,
+            "seq-1",
         )
 
         user_input = context.get("user_input", "")
@@ -246,42 +269,43 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
             "user_input": user_input,
         }
 
-        print(f"DEBUG: [ScenarioManager] POST {url} | Payload: {payload}")
-
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(url, json=payload)
-                if response.status_code != 200:
-                    detail = (
-                        response.json().get("detail", response.text)
-                        if response.headers.get("content-type") == "application/json"
-                        else response.text
-                    )
-                    print(f"DEBUG: [Scenario] {response.status_code}: {detail[:50]}")
-                    # Raise a more descriptive error for domain issues
-                    if response.status_code == 404:
-                        raise ValueError(f"Scenario Context Missing: {detail}")
+                response = await client.post(url, json=payload, timeout=15.0)
+                if response.status_code == 404:
+                    try:
+                        detail = response.json().get("detail", response.text or "Not Found")
+                    except Exception:
+                        detail = response.text or "Not Found"
+                    raise ValueError(f"Scenario Context Missing: {detail}")
                 response.raise_for_status()
-
-                data = response.json()
-
+                data = _unwrap_response_data(response.json())
             except Exception as e:
-                print(f"DEBUG: [ScenarioManager] Request failed: {e}")
+                logger.error(
+                    "scenario_client_error scenario_id=%s act_id=%s seq_id=%s error=%s",
+                    scenario_id,
+                    act_id,
+                    seq_id,
+                    type(e).__name__,
+                )
                 raise e
 
-            # Map ValidationOutput to ScenarioSuggestion
             is_triggered = data.get("is_triggered", False)
             reason = data.get("reason", "No reason provided")
             narration = data.get("suggested_narration")
             next_act_id = data.get("next_act_id")
             next_seq_id = data.get("next_seq_id")
+            if next_act_id and not ACT_ID_RE.match(str(next_act_id)):
+                logger.warning("invalid_next_act_id_from_scenario_service id=%s", next_act_id)
+                next_act_id = None
+            if next_seq_id and not SEQ_ID_RE.match(str(next_seq_id)):
+                logger.warning("invalid_next_seq_id_from_scenario_service id=%s", next_seq_id)
+                next_seq_id = None
 
-            from gm.core.models.scenario import ScenarioConstraintType
+            from gm.schemas.scenario import ScenarioConstraintType
 
             return ScenarioSuggestion(
-                constraint_type=ScenarioConstraintType.MANDATORY
-                if is_triggered
-                else ScenarioConstraintType.ADVISORY,
+                constraint_type=ScenarioConstraintType.MANDATORY if is_triggered else ScenarioConstraintType.ADVISORY,
                 description=reason,
                 correction_diffs=[],
                 narrative_slot=narration,
@@ -305,90 +329,77 @@ class StateManagerHTTPClient(StateManagerPort):
         url = f"{settings.STATE_MANAGER_URL}/state/commit"
         payload = {"turn_id": turn_id, "diffs": [d.model_dump() for d in diffs]}
 
-        print(f"DEBUG: [StateManager] POST {url} | Payload: {payload}")
-
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload)
-            print(
-                f"DEBUG: [StateManager] {response.status_code} | {response.text[:100]}"
-            )
+            response = await client.post(url, json=payload, timeout=10.0)
             response.raise_for_status()
-
             data = response.json()
-            if (
-                isinstance(data, dict)
-                and "data" in data
-                and data.get("status") == "success"
-            ):
+            if isinstance(data, dict) and data.get("status") == "success" and "data" in data:
                 return data["data"]
             return data
 
     @retry_policy
     async def get_state(self, session_id: str) -> Dict[str, Any]:
         url = f"{settings.STATE_MANAGER_URL}/state/session/{session_id}"
-        print(f"DEBUG: [StateManager] GET {url}")
         async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            print(
-                f"DEBUG: [StateManager] {response.status_code} | {response.text[:100]}"
-            )
+            response = await client.get(url, timeout=5.0)
             response.raise_for_status()
-            # If the response is WrappedResponse, extract 'data'
             data = response.json()
-            if (
-                isinstance(data, dict)
-                and "data" in data
-                and data.get("status") == "success"
-            ):
+            if isinstance(data, dict) and data.get("status") == "success" and "data" in data:
+                return data["data"]
+            return data
+
+    @retry_policy
+    async def get_act_details(self, session_id: str) -> Dict[str, Any]:
+        url = f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/act/details"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=5.0)
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, dict) and data.get("status") == "success" and "data" in data:
                 return data["data"]
             return data
 
     @retry_policy
     async def get_sequence_details(self, session_id: str) -> Dict[str, Any]:
-        url = (
-            f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/sequence/details"
-        )
-        print(f"DEBUG: [StateManager] GET {url}")
+        url = f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/sequence/details"
         async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            print(
-                f"DEBUG: [StateManager] {response.status_code} | {response.text[:100]}"
-            )
+            response = await client.get(url, timeout=5.0)
             response.raise_for_status()
             data = response.json()
-            if (
-                isinstance(data, dict)
-                and "data" in data
-                and data.get("status") == "success"
-            ):
+            if isinstance(data, dict) and data.get("status") == "success" and "data" in data:
                 return data["data"]
             return data
 
     @retry_policy
-    async def update_act(self, session_id: str, act_id: str) -> Dict[str, Any]:
+    async def update_act(self, session_id: str, act_id: str, seq_id: str) -> Dict[str, Any]:
         url = f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/act"
-        # Extract integer from 'act-X'
-        digits = "".join(filter(str.isdigit, str(act_id)))
-        act_num = int(digits) if digits else 1
-
-        print(f"DEBUG: [StateManager] PUT {url} | act_id: {act_id} (num: {act_num})")
+        act_id = _normalize_hierarchy_id(act_id, ACT_ID_RE, "act-1")
+        seq_id = _normalize_hierarchy_id(seq_id, SEQ_ID_RE, "seq-1")
+        act_digits = "".join(filter(str.isdigit, str(act_id)))
+        seq_digits = "".join(filter(str.isdigit, str(seq_id)))
+        act_num = int(act_digits) if act_digits else 1
+        seq_num = int(seq_digits) if seq_digits else 1
+        payload = {
+            "new_act": act_num,
+            "new_act_id": str(act_id),
+            "new_sequence_id": str(seq_id),
+        }
         async with httpx.AsyncClient() as client:
-            response = await client.put(url, json={"new_act": act_num})
+            response = await client.put(url, json=payload, timeout=5.0)
             response.raise_for_status()
-            return response.json()
+            return _unwrap_response_data(response.json())
 
     @retry_policy
     async def update_sequence(self, session_id: str, seq_id: str) -> Dict[str, Any]:
         url = f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/sequence"
-        # Extract integer from 'seq-X'
+        seq_id = _normalize_hierarchy_id(seq_id, SEQ_ID_RE, "seq-1")
         digits = "".join(filter(str.isdigit, str(seq_id)))
         seq_num = int(digits) if digits else 1
-
-        print(f"DEBUG: [StateManager] PUT {url} | seq_id: {seq_id} (num: {seq_num})")
+        payload = {"new_sequence": seq_num, "new_sequence_id": str(seq_id)}
         async with httpx.AsyncClient() as client:
-            response = await client.put(url, json={"new_sequence": seq_num})
+            response = await client.put(url, json=payload, timeout=5.0)
             response.raise_for_status()
-            return response.json()
+            return _unwrap_response_data(response.json())
 
     async def check_health(self) -> bool:
         url = f"{settings.STATE_MANAGER_URL}/health"

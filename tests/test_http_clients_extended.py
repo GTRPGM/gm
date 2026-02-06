@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
-from gm.core.models.rule import RuleOutcome, RuleSuggestion
-from gm.core.models.state import EntityDiff
+from gm.schemas.rule_engine import RuleOutcome, RuleSuggestion
+from gm.schemas.common import EntityDiff
 from gm.plugins.external.http_client import (
     RuleManagerHTTPClient,
     ScenarioManagerHTTPClient,
@@ -156,3 +156,59 @@ async def test_health_checks(respx_mock):
         return_value=httpx.Response(200)
     )
     assert await StateManagerHTTPClient().check_health() is True
+
+
+@pytest.mark.asyncio
+async def test_scenario_manager_normalizes_invalid_sequence_ids(respx_mock):
+    client = ScenarioManagerHTTPClient()
+    route = respx_mock.post("http://scenario-service:8040/api/v1/check/validate").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "status": "success",
+                "data": {
+                    "is_triggered": False,
+                    "reason": "ok",
+                    "suggested_narration": "narr",
+                    "next_act_id": "act-2",
+                    "next_seq_id": "창고_탐색",
+                },
+            },
+        )
+    )
+
+    outcome = RuleOutcome(
+        session_id="s1",
+        scenario_id="scn-1",
+        success=True,
+        reason="ok",
+        suggested=RuleSuggestion(),
+    )
+    result = await client.get_proposal(
+        {
+            "rule_outcome": outcome,
+            "world_snapshot": {"current_act_id": "act-1", "current_sequence_id": "창고_탐색"},
+        }
+    )
+
+    payload = route.calls[0].request.content.decode("utf-8")
+    assert '"seq_id":"seq-1"' in payload.replace(" ", "")
+    assert result.next_seq_id is None
+    assert result.next_act_id == "act-2"
+
+
+@pytest.mark.asyncio
+async def test_state_manager_update_sequence_normalizes_invalid_id(respx_mock):
+    client = StateManagerHTTPClient()
+    route = respx_mock.put("http://state-manager:8030/state/session/s1/sequence").mock(
+        return_value=httpx.Response(
+            200, json={"status": "success", "data": {"current_sequence_id": "seq-1"}}
+        )
+    )
+
+    result = await client.update_sequence("s1", "창고_탐색")
+
+    payload = route.calls[0].request.content.decode("utf-8")
+    assert '"new_sequence_id":"seq-1"' in payload.replace(" ", "")
+    assert '"new_sequence":1' in payload.replace(" ", "")
+    assert result["current_sequence_id"] == "seq-1"
