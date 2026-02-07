@@ -120,6 +120,37 @@ class GameEngine:
 
         return actor or "unknown"
 
+    @staticmethod
+    def _has_live_enemies_in_current_sequence(snapshot: Dict[str, Any]) -> bool:
+        current_seq_id = str(snapshot.get("current_sequence_id") or "")
+        enemies = snapshot.get("enemies", []) or []
+
+        for enemy in enemies:
+            if not isinstance(enemy, dict):
+                continue
+
+            assigned_seq_id = str(enemy.get("assigned_sequence_id") or "")
+            if current_seq_id and assigned_seq_id and assigned_seq_id != current_seq_id:
+                continue
+
+            if bool(enemy.get("is_defeated")):
+                continue
+
+            hp = enemy.get("current_hp")
+            if hp is None:
+                hp = ((enemy.get("state") or {}).get("numeric") or {}).get("HP")
+
+            if hp is None:
+                return True
+
+            try:
+                if int(hp) > 0:
+                    return True
+            except (TypeError, ValueError):
+                return True
+
+        return False
+
     async def get_session_history(self, session_id: str) -> List[Dict[str, Any]]:
         query = self.db.get_query("get_session_history")
         rows = await self.db.fetch(query, session_id)
@@ -146,6 +177,17 @@ class GameEngine:
         return history
 
     async def process_player_turn(self, user_input: Any) -> Dict[str, Any]:
+        pre_sequence_id: str | None = None
+        try:
+            before = await self.state_client.get_state(user_input.session_id)
+            pre_sequence_id = (
+                str(before.get("current_sequence_id"))
+                if before.get("current_sequence_id")
+                else None
+            )
+        except Exception:
+            pre_sequence_id = None
+
         player_state = {
             "session_id": user_input.session_id,
             "user_input": user_input.content,
@@ -174,12 +216,41 @@ class GameEngine:
         # 2. Check if there are active entities (NPCs/Enemies)
         snapshot = player_result_state.get("world_snapshot", {})
         entities = snapshot.get("entities", [])
+        scenario = player_result_state.get("scenario_suggestion")
+
+        should_end = bool(getattr(scenario, "should_end", False))
+        latest = None
+        if not should_end:
+            try:
+                latest = await self.state_client.get_state(user_input.session_id)
+                should_end = str(latest.get("status", "")).lower() == "ended"
+            except Exception:
+                # 상태 조회 실패는 치명 에러로 올리지 않고 기존 흐름을 유지
+                pass
+        post_sequence_id = (
+            str((latest or {}).get("current_sequence_id"))
+            if isinstance(latest, dict) and (latest or {}).get("current_sequence_id")
+            else None
+        )
+        sequence_transitioned = bool(
+            pre_sequence_id and post_sequence_id and pre_sequence_id != post_sequence_id
+        )
 
         # 3. Process NPC Turn only if entities exist
-        if entities:
+        if entities and not should_end and not sequence_transitioned:
             logger.info(f"Active entities found: {entities}. Proceeding to NPC turn.")
             npc_response = await self.process_npc_turn(user_input.session_id)
             player_response["npc_turn"] = npc_response
+        elif entities and sequence_transitioned:
+            logger.info(
+                "Sequence transitioned (%s -> %s). Skipping NPC turn for this player turn.",
+                pre_sequence_id,
+                post_sequence_id,
+            )
+            player_response["npc_turn"] = None
+        elif entities and should_end:
+            logger.info("Session already ended. Skipping NPC turn.")
+            player_response["npc_turn"] = None
         else:
             logger.info("No active entities found. Skipping NPC turn.")
             player_response["npc_turn"] = None
@@ -270,9 +341,17 @@ class GameEngine:
 
         entities = []
         for npc in snapshot.get("npcs", []):
-            entities.append(npc.get("scenario_entity_id"))
+            entities.append(
+                npc.get("scenario_entity_id")
+                or npc.get("scenario_npc_id")
+                or npc.get("npc_id")
+            )
         for enemy in snapshot.get("enemies", []):
-            entities.append(enemy.get("scenario_entity_id"))
+            entities.append(
+                enemy.get("scenario_entity_id")
+                or enemy.get("scenario_enemy_id")
+                or enemy.get("enemy_id")
+            )
         snapshot["entities"] = entities
 
         logger.info(
@@ -527,14 +606,21 @@ class GameEngine:
         turn_id = state.get("turn_id")
         if not turn_id:
             raise ValueError("Turn ID is missing")
+        logger.info(
+            "   -> Commit turn_id=%s (state.session_id=%s)",
+            turn_id,
+            state.get("session_id"),
+        )
 
         final_diffs = state.get("final_diffs", [])
+        logger.info("   -> final_diffs count=%s", len(final_diffs))
 
         # 1. Commit entity diffs
         result = await self.state_client.commit(turn_id, final_diffs)
 
         # 2. Handle Location Transition (Act/Sequence Jump) from Scenario Service
         scenario = state.get("scenario_suggestion")
+        transitioned = False
         if scenario:
             if scenario.next_act_id:
                 if not scenario.next_seq_id:
@@ -546,11 +632,55 @@ class GameEngine:
                 await self.state_client.update_act(
                     state["session_id"], scenario.next_act_id, scenario.next_seq_id
                 )
+                transitioned = True
             elif scenario.next_seq_id:
                 logger.info(f"   -> Transitioning to SEQUENCE: {scenario.next_seq_id}")
                 await self.state_client.update_sequence(
                     state["session_id"], scenario.next_seq_id
                 )
+                transitioned = True
+
+            # Explicit scenario completion signal from scenario-service.
+            if scenario.should_end and not transitioned:
+                session_id = state["session_id"]
+                try:
+                    latest_state = await self.state_client.get_state(session_id)
+                    latest_sequence = await self.state_client.get_sequence_details(
+                        session_id
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "   -> Unable to verify terminal enemy state. "
+                        "Deferring end_session. error=%s",
+                        type(e).__name__,
+                    )
+                    scenario.should_end = False
+                    latest_state = None
+                    latest_sequence = None
+
+                latest_snapshot = dict(latest_state or {})
+                if isinstance(latest_sequence, dict):
+                    if latest_sequence.get("enemies") is not None:
+                        latest_snapshot["enemies"] = latest_sequence.get("enemies")
+                    if (
+                        not latest_snapshot.get("current_sequence_id")
+                        and latest_sequence.get("sequence_id")
+                    ):
+                        latest_snapshot["current_sequence_id"] = latest_sequence.get(
+                            "sequence_id"
+                        )
+
+                if latest_snapshot and self._has_live_enemies_in_current_sequence(
+                    latest_snapshot
+                ):
+                    logger.info(
+                        "   -> Terminal signal received but live enemies remain. "
+                        "Deferring end_session."
+                    )
+                    scenario.should_end = False
+                elif latest_snapshot:
+                    logger.info("   -> Ending session by scenario completion signal")
+                    await self.state_client.end_session(session_id)
 
         return {"commit_id": result["commit_id"]}
 
@@ -592,15 +722,22 @@ class GameEngine:
         # Fetch history for context
         history = await self._fetch_history(state["session_id"], limit=5)
         narrative = ""
-        required_narrative_instruction = (
-            (
+        required_phrases: list[str] = []
+        if required_slot:
+            required_phrases.append(str(required_slot))
+        if scenario.should_end:
+            # Ensure terminal narration is explicit for downstream validation.
+            required_phrases.append("모험은 끝이 났다.")
+
+        required_narrative_instruction = ""
+        if required_phrases:
+            joined = "\n".join(f"- {p}" for p in required_phrases)
+            required_narrative_instruction = (
                 "\n[필수 포함 내용]"
-                "\n다음 문장을 서술의 마지막이나 적절한 위치에 "
-                f"'토씨 하나 틀리지 말고' 그대로 포함하십시오:\n{required_slot}"
+                "\n아래 문장을 서술의 마지막이나 적절한 위치에 "
+                "'토씨 하나 틀리지 말고' 그대로 포함하십시오:\n"
+                f"{joined}"
             )
-            if required_slot
-            else ""
-        )
 
         for _ in range(max_retries):
             try:
@@ -614,11 +751,25 @@ class GameEngine:
                     "goal": snapshot.get("goal"),
                     "exit_triggers": snapshot.get("exit_triggers", []),
                     "npcs": [
-                        {"id": n.get("scenario_entity_id"), "name": n.get("name")}
+                        {
+                            "id": (
+                                n.get("scenario_entity_id")
+                                or n.get("scenario_npc_id")
+                                or n.get("npc_id")
+                            ),
+                            "name": n.get("name"),
+                        }
                         for n in snapshot.get("npcs", [])
                     ],
                     "enemies": [
-                        {"id": e.get("scenario_entity_id"), "name": e.get("name")}
+                        {
+                            "id": (
+                                e.get("scenario_entity_id")
+                                or e.get("scenario_enemy_id")
+                                or e.get("enemy_id")
+                            ),
+                            "name": e.get("name"),
+                        }
                         for e in snapshot.get("enemies", [])
                     ],
                     "items": [
@@ -640,8 +791,12 @@ class GameEngine:
                 raise e
             narrative = response_msg.content
 
-            if required_slot and required_slot not in narrative:
-                logger.warning(f"Narrative missing slot '{required_slot}'. Retrying...")
+            missing_phrases = [p for p in required_phrases if p not in narrative]
+            if missing_phrases:
+                logger.warning(
+                    "Narrative missing required phrase(s) %s. Retrying...",
+                    missing_phrases,
+                )
                 continue
             break
 

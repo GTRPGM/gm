@@ -59,5 +59,10 @@ class StateManagerPort(ABC):
         pass
 
     @abstractmethod
+    async def end_session(self, session_id: str) -> Dict[str, Any]:
+        """Mark session as ended."""
+        pass
+
+    @abstractmethod
     async def check_health(self) -> bool:
         pass

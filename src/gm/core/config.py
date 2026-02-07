@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     WEB_HOST: str = "web"
     WEB_PORT: int = 8080
 
-    LLM_MODEL_NAME: str = "gemini-2.0-flash-lite"
+    LLM_MODEL_NAME: str = "gpt-4o-mini"
 
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True)
 

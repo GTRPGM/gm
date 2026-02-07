@@ -90,6 +90,13 @@ class RuleManagerHTTPClient(RuleManagerPort):
             digits = "".join(filter(str.isdigit, str(raw_id)))
             return int(digits) if digits else None
 
+        def parse_positive_int(raw: Any) -> int | None:
+            try:
+                val = int(raw)
+                return val if val > 0 else None
+            except (TypeError, ValueError):
+                return None
+
         master_to_instance = {}
 
         player_id = snapshot.get("player_id")
@@ -110,9 +117,16 @@ class RuleManagerHTTPClient(RuleManagerPort):
             master_to_instance["player"] = str(player_id)
 
         for npc in snapshot.get("npcs", []):
-            m_id = npc.get("scenario_entity_id")
-            s_id = str(npc.get("id"))
-            entity_id = parse_entity_id(m_id)
+            m_id = (
+                npc.get("scenario_entity_id")
+                or npc.get("scenario_npc_id")
+                or npc.get("npc_id")
+            )
+            s_id = str(npc.get("id") or npc.get("npc_id") or "")
+            rule_id_val = parse_positive_int(npc.get("rule_id"))
+            entity_id = rule_id_val if rule_id_val is not None else parse_entity_id(m_id)
+            if not s_id:
+                continue
             req_entities.append(
                 RuleRequestEntity(
                     state_entity_id=s_id,
@@ -126,9 +140,16 @@ class RuleManagerHTTPClient(RuleManagerPort):
                 master_to_instance[m_id] = s_id
 
         for enemy in snapshot.get("enemies", []):
-            m_id = enemy.get("scenario_entity_id")
-            s_id = str(enemy.get("id"))
-            entity_id = parse_entity_id(m_id)
+            m_id = (
+                enemy.get("scenario_entity_id")
+                or enemy.get("scenario_enemy_id")
+                or enemy.get("enemy_id")
+            )
+            s_id = str(enemy.get("id") or enemy.get("enemy_id") or "")
+            rule_id_val = parse_positive_int(enemy.get("rule_id"))
+            entity_id = rule_id_val if rule_id_val is not None else parse_entity_id(m_id)
+            if not s_id:
+                continue
             req_entities.append(
                 RuleRequestEntity(
                     state_entity_id=s_id,
@@ -213,7 +234,15 @@ class RuleManagerHTTPClient(RuleManagerPort):
                 response = await client.post(url, json=payload, timeout=15.0)
                 response.raise_for_status()
                 data = _unwrap_response_data(response.json())
-                return RuleOutcome(**data)
+                outcome = RuleOutcome(**data)
+                logger.info(
+                    "rule_outcome_summary phase=%s success=%s diffs=%s relations=%s",
+                    getattr(outcome, "phase_type", None),
+                    getattr(outcome, "success", None),
+                    len(getattr(outcome.suggested, "diffs", []) or []),
+                    len(getattr(outcome.suggested, "relations", []) or []),
+                )
+                return outcome
         except Exception as e:
             logger.error(
                 "rule_client_error session_id=%s scenario_id=%s error=%s",
@@ -300,6 +329,7 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
             narration = data.get("suggested_narration")
             next_act_id = data.get("next_act_id")
             next_seq_id = data.get("next_seq_id")
+            should_end = bool(data.get("should_end", False))
             if next_act_id and not ACT_ID_RE.match(str(next_act_id)):
                 logger.warning(
                     "invalid_next_act_id_from_scenario_service id=%s", next_act_id
@@ -322,6 +352,7 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
                 narrative_slot=narration,
                 next_act_id=next_act_id,
                 next_seq_id=next_seq_id,
+                should_end=should_end,
             )
 
     async def check_health(self) -> bool:
@@ -427,6 +458,14 @@ class StateManagerHTTPClient(StateManagerPort):
         payload = {"new_sequence": seq_num, "new_sequence_id": str(seq_id)}
         async with httpx.AsyncClient() as client:
             response = await client.put(url, json=payload, timeout=5.0)
+            response.raise_for_status()
+            return _unwrap_response_data(response.json())
+
+    @retry_policy
+    async def end_session(self, session_id: str) -> Dict[str, Any]:
+        url = f"{settings.STATE_MANAGER_URL}/state/session/{session_id}/end"
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, timeout=5.0)
             response.raise_for_status()
             return _unwrap_response_data(response.json())
 

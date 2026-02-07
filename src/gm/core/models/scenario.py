@@ -24,3 +24,4 @@ class ScenarioSuggestion(BaseModel):
     )
     next_act_id: Optional[str] = Field(None, description="이동할 다음 액트 ID")
     next_seq_id: Optional[str] = Field(None, description="이동할 다음 시퀀스 ID")
+    should_end: bool = Field(False, description="세션 종료 필요 여부")
