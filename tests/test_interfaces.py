@@ -45,6 +45,9 @@ class MockStateManager(StateManagerPort):
     async def update_sequence(self, session_id: str, seq_id: str):
         return {}
 
+    async def end_session(self, session_id: str):
+        return {}
+
     async def check_health(self) -> bool:
         return True
 

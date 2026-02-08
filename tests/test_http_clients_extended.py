@@ -51,7 +51,13 @@ async def test_rule_manager_complex_payload(respx_mock):
                     "to_id": "dragon_master",
                     "relation_type": "HOSTILE",
                     "affinity": -50,
-                }
+                },
+                {
+                    "from_id": "orc_master",
+                    "to_id": "item-iron-sword-1",
+                    "relation_type": "OWNERSHIP",
+                    "affinity": None,
+                },
             ],
             "player_npc_relations": [
                 {"npc_id": "npc_456", "relation_type": "FRIENDLY", "affinity_score": 80}
@@ -70,6 +76,7 @@ async def test_rule_manager_complex_payload(respx_mock):
     assert any(e["state_entity_id"] == "p1" for e in payload["entities"])
     assert any(e["state_entity_id"] == "npc_456" for e in payload["entities"])
     assert any(e["state_entity_id"] == "enemy_789" for e in payload["entities"])
+    assert payload["actor_id"] == "npc_456"
 
     assert len(payload["relations"]) == 2
     assert any(
@@ -80,6 +87,47 @@ async def test_rule_manager_complex_payload(respx_mock):
         r["cause_entity_id"] == "p1" and r["effect_entity_id"] == "npc_456"
         for r in payload["relations"]
     )
+    assert not any("item-iron-sword-1" in (r["cause_entity_id"], r["effect_entity_id"]) for r in payload["relations"])
+
+
+@pytest.mark.asyncio
+async def test_rule_manager_maps_player_actor_id_to_state_entity_id(respx_mock):
+    client = RuleManagerHTTPClient()
+    respx_mock.post("http://rule-engine:8050/play/scenario").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "status": "success",
+                "data": {
+                    "session_id": "123",
+                    "scenario_id": "1",
+                    "success": True,
+                    "reason": "ok",
+                    "suggested": {"diffs": [], "relations": []},
+                },
+            },
+        )
+    )
+
+    await client.get_proposal(
+        {
+            "session_id": "123",
+            "user_input": "공격한다",
+            "active_entity_id": "player",
+            "world_snapshot": {
+                "player_id": "player-state-uuid-1",
+                "player_name": "Hero",
+                "npcs": [],
+                "enemies": [],
+            },
+        }
+    )
+
+    request = respx_mock.calls.last.request
+    import json
+
+    payload = json.loads(request.content)
+    assert payload["actor_id"] == "player-state-uuid-1"
 
 
 @pytest.mark.asyncio

@@ -246,9 +246,9 @@ async def test_conflict_resolution_scenario_wins(
 @pytest.mark.asyncio
 async def test_narrative_retry_logic(mock_external_services, mock_db_handler):
     """
-    Precision Test 2: Narrative Retry
-    Scenario requires a specific slot word. LLM fails first, succeeds second.
-    Expectation: Pipeline retries and returns the valid narrative.
+    Precision Test 2: Narrative Slot Is Not Enforced
+    Scenario may provide suggested_narration, but GM should not force it.
+    Expectation: Pipeline accepts first valid generation without slot retry.
     """
     mock_external_services.routes.clear()
 
@@ -272,7 +272,7 @@ async def test_narrative_retry_logic(mock_external_services, mock_db_handler):
         )
     )
 
-    # Scenario demands "SECRET_KEY" in narrative
+    # Scenario may suggest "SECRET_KEY" but should not force it.
     mock_external_services.post(
         f"{settings.SCENARIO_SERVICE_URL}/api/v1/check/validate"
     ).mock(
@@ -315,17 +315,14 @@ async def test_narrative_retry_logic(mock_external_services, mock_db_handler):
         )
     )
 
-    # LLM: First attempt fail, Second attempt success
+    # LLM: first response should be accepted as-is
     llm_route = mock_external_services.post(
         f"{settings.LLM_GATEWAY_URL}/api/v1/chat/completions"
     )
     llm_route.side_effect = [
         Response(
             200, json=create_chat_completion_response("Just a normal story.")
-        ),  # Missing slot
-        Response(
-            200, json=create_chat_completion_response("You found the SECRET_KEY!")
-        ),  # Has slot
+        ),
     ]
 
     # Execute
@@ -345,8 +342,8 @@ async def test_narrative_retry_logic(mock_external_services, mock_db_handler):
     final_state = await engine.graph.ainvoke(initial_state)
 
     # Verify
-    assert "SECRET_KEY" in final_state["narrative"]
-    assert llm_route.call_count == 2
+    assert final_state["narrative"] == "Just a normal story."
+    assert llm_route.call_count == 1
 
 
 @pytest.mark.asyncio

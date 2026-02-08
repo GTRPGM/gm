@@ -162,23 +162,24 @@ class RuleManagerHTTPClient(RuleManagerPort):
             if m_id:
                 master_to_instance[m_id] = s_id
 
-        if active_entity_id and active_entity_id != "player":
-            actual_active_id = master_to_instance.get(
-                active_entity_id, active_entity_id
-            )
-            if not any(
-                e.state_entity_id == str(actual_active_id) for e in req_entities
-            ):
-                req_entities.append(
-                    RuleRequestEntity(
-                        state_entity_id=str(actual_active_id),
-                        entity_name=str(actual_active_id),
-                        entity_type="object",
-                        phase_id=phase_id,
-                    )
+        actual_active_id = master_to_instance.get(active_entity_id, active_entity_id)
+        if not actual_active_id and player_id:
+            actual_active_id = str(player_id)
+
+        if actual_active_id and not any(
+            e.state_entity_id == str(actual_active_id) for e in req_entities
+        ):
+            req_entities.append(
+                RuleRequestEntity(
+                    state_entity_id=str(actual_active_id),
+                    entity_name=str(actual_active_id),
+                    entity_type="object",
+                    phase_id=phase_id,
                 )
+            )
 
         req_relations = []
+        valid_entity_ids = {e.state_entity_id for e in req_entities}
 
         for rel in snapshot.get("entity_relations", []):
             r_type = rel.get("relation_type", "NEUTRAL")
@@ -188,6 +189,10 @@ class RuleManagerHTTPClient(RuleManagerPort):
             to_m_id = rel.get("to_id")
             from_s_id = master_to_instance.get(from_m_id, from_m_id)
             to_s_id = master_to_instance.get(to_m_id, to_m_id)
+            if str(from_s_id) not in valid_entity_ids or str(to_s_id) not in valid_entity_ids:
+                # Rule engine currently handles Player/NPC/Enemy relations only.
+                # Skip edges that point to item-level scenario IDs.
+                continue
 
             req_relations.append(
                 {
@@ -218,12 +223,14 @@ class RuleManagerHTTPClient(RuleManagerPort):
             context.get("scenario_id") or snapshot.get("scenario_id") or "unknown"
         )
         locale_id = int(context.get("locale_id", 0))
+        sequence_type = str(context.get("sequence_type") or "EXPLORATION")
 
         payload = {
             "session_id": session_id,
             "scenario_id": scenario_id,
             "locale_id": locale_id,
-            "actor_id": active_entity_id,
+            "sequence_type": sequence_type,
+            "actor_id": str(actual_active_id or active_entity_id or ""),
             "entities": [e.model_dump() for e in req_entities],
             "relations": req_relations,
             "story": user_input,
@@ -281,6 +288,7 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
             or "unknown"
         )
 
+        user_input = context.get("user_input", "")
         act_id = _normalize_hierarchy_id(
             snapshot.get("current_act_id") or context.get("act_id"),
             ACT_ID_RE,
@@ -291,8 +299,6 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
             SEQ_ID_RE,
             "seq-1",
         )
-
-        user_input = context.get("user_input", "")
 
         payload = {
             "scenario_id": scenario_id,

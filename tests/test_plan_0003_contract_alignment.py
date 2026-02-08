@@ -205,3 +205,118 @@ async def test_commit_state_ends_when_no_live_enemy_exists():
     await GameEngine.commit_state.__wrapped__(engine, state)
 
     state_client.end_session.assert_awaited_once_with("s1")
+
+
+@pytest.mark.asyncio
+async def test_commit_state_still_defers_when_live_enemy_exists_even_if_input_is_terminal():
+    state_client = MagicMock()
+    state_client.commit = AsyncMock(return_value={"commit_id": "c1"})
+    state_client.update_act = AsyncMock()
+    state_client.update_sequence = AsyncMock()
+    state_client.end_session = AsyncMock()
+    state_client.get_state = AsyncMock(
+        return_value={
+            "current_sequence_id": "seq-6",
+        }
+    )
+    state_client.get_sequence_details = AsyncMock(
+        return_value={
+            "sequence_id": "seq-6",
+            "exit_triggers": ["핵심 적을 처치하고 봉인을 안정화한다."],
+            "enemies": [
+                {
+                    "assigned_sequence_id": "seq-6",
+                    "current_hp": 10,
+                    "is_defeated": False,
+                }
+            ],
+        }
+    )
+
+    engine = GameEngine(
+        rule_client=MagicMock(),
+        scenario_client=MagicMock(),
+        state_client=state_client,
+        llm=MagicMock(),
+        db=MagicMock(),
+    )
+
+    scenario = ScenarioSuggestion(
+        constraint_type=ScenarioConstraintType.MANDATORY,
+        description="terminal",
+        should_end=True,
+    )
+    state = {
+        "session_id": "s1",
+        "turn_id": "s1:1",
+        "user_input": "핵심 적을 처치하고 봉인을 안정화한다.",
+        "final_diffs": [],
+        "scenario_suggestion": scenario,
+    }
+
+    await GameEngine.commit_state.__wrapped__(engine, state)
+
+    state_client.end_session.assert_not_awaited()
+    assert scenario.should_end is False
+
+
+@pytest.mark.asyncio
+async def test_commit_state_auto_ends_on_last_sequence_when_all_enemies_defeated():
+    state_client = MagicMock()
+    state_client.commit = AsyncMock(return_value={"commit_id": "c1"})
+    state_client.update_act = AsyncMock()
+    state_client.update_sequence = AsyncMock()
+    state_client.end_session = AsyncMock()
+    state_client.get_state = AsyncMock(
+        return_value={
+            "current_sequence_id": "seq-6",
+        }
+    )
+    state_client.get_sequence_details = AsyncMock(
+        return_value={
+            "sequence_id": "seq-6",
+            "enemies": [
+                {
+                    "assigned_sequence_id": "seq-6",
+                    "current_hp": 0,
+                    "is_defeated": True,
+                },
+                {
+                    "assigned_sequence_id": "seq-6",
+                    "current_hp": 0,
+                    "is_defeated": True,
+                },
+            ],
+        }
+    )
+    state_client.get_act_details = AsyncMock(
+        return_value={
+            "act_id": "act-3",
+            "sequence_ids": ["seq-5", "seq-6"],
+        }
+    )
+
+    engine = GameEngine(
+        rule_client=MagicMock(),
+        scenario_client=MagicMock(),
+        state_client=state_client,
+        llm=MagicMock(),
+        db=MagicMock(),
+    )
+
+    scenario = ScenarioSuggestion(
+        constraint_type=ScenarioConstraintType.ADVISORY,
+        description="still active",
+        should_end=False,
+    )
+    state = {
+        "session_id": "s1",
+        "turn_id": "s1:1",
+        "final_diffs": [],
+        "scenario_suggestion": scenario,
+    }
+
+    await GameEngine.commit_state.__wrapped__(engine, state)
+
+    state_client.end_session.assert_awaited_once_with("s1")
+    assert scenario.should_end is True

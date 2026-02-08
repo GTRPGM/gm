@@ -2,6 +2,7 @@ import functools
 import json
 import logging
 import os
+import re
 from typing import Any, Callable, Dict, List, TypeVar, cast
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -78,6 +79,26 @@ def log_node_execution(func: F) -> F:
 
 
 class GameEngine:
+    _TERMINAL_CLAIM_PATTERNS = [
+        r"모험은 끝이 났다",
+        r"작전[이가은는 ]*성공적으로[ ]*마무리",
+        r"작전[을를 ]*마무리",
+        r"결전[을를 ]*마무리",
+        r"전투[가은는 ]*끝났",
+        r"전투[가은는 ]*끝나",
+        r"모든[ ]*적[이가은는 ]*쓰러",
+        r"마침내[ ].*쓰러",
+        r"적의[ ]*위협[이가은는 ]*사라졌",
+        r"봉인.*안정화",
+        r"마지막[ ]*남은[ ]*.*적",
+        r"핵심[ ]*적[을를 ]*처치",
+        r"승리[를을 ]*확신",
+        r"승리",
+        r"고통[이가은는 ]*마침내[ ]*끝",
+        r"전투의[ ]*긴장감[이가은는 ]*사라",
+        r"평화로[ ]*가득",
+    ]
+
     def __init__(
         self,
         rule_client: RuleManagerPort,
@@ -150,6 +171,114 @@ class GameEngine:
                 return True
 
         return False
+
+    @staticmethod
+    def _count_enemies_in_current_sequence(snapshot: Dict[str, Any]) -> int:
+        current_seq_id = str(snapshot.get("current_sequence_id") or "")
+        enemies = snapshot.get("enemies", []) or []
+        count = 0
+        for enemy in enemies:
+            if not isinstance(enemy, dict):
+                continue
+            assigned_seq_id = str(enemy.get("assigned_sequence_id") or "")
+            if current_seq_id and assigned_seq_id and assigned_seq_id != current_seq_id:
+                continue
+            count += 1
+        return count
+
+    @staticmethod
+    def _count_live_enemies_in_current_sequence(snapshot: Dict[str, Any]) -> int:
+        current_seq_id = str(snapshot.get("current_sequence_id") or "")
+        enemies = snapshot.get("enemies", []) or []
+        count = 0
+        for enemy in enemies:
+            if not isinstance(enemy, dict):
+                continue
+            assigned_seq_id = str(enemy.get("assigned_sequence_id") or "")
+            if current_seq_id and assigned_seq_id and assigned_seq_id != current_seq_id:
+                continue
+            if bool(enemy.get("is_defeated")):
+                continue
+            hp = enemy.get("current_hp")
+            if hp is None:
+                hp = ((enemy.get("state") or {}).get("numeric") or {}).get("HP")
+            if hp is None:
+                count += 1
+                continue
+            try:
+                if int(hp) > 0:
+                    count += 1
+            except (TypeError, ValueError):
+                count += 1
+        return count
+
+    @staticmethod
+    def _is_last_sequence_in_act(
+        current_sequence_id: str | None, act_details: Dict[str, Any] | None
+    ) -> bool:
+        if not current_sequence_id or not isinstance(act_details, dict):
+            return False
+        sequence_ids = act_details.get("sequence_ids") or []
+        if not isinstance(sequence_ids, list) or not sequence_ids:
+            return False
+        return str(sequence_ids[-1]) == str(current_sequence_id)
+
+    @classmethod
+    def _contains_terminal_claim(cls, text: str | None) -> bool:
+        if not text:
+            return False
+        src = str(text)
+        return any(
+            re.search(pattern, src, flags=re.IGNORECASE)
+            for pattern in cls._TERMINAL_CLAIM_PATTERNS
+        )
+
+    @classmethod
+    def _sanitize_terminal_claims(cls, text: str | None) -> str:
+        src = str(text or "")
+        out = src
+        for pattern in cls._TERMINAL_CLAIM_PATTERNS:
+            out = re.sub(pattern, "", out, flags=re.IGNORECASE)
+        out = re.sub(r"\n{3,}", "\n\n", out).strip()
+        if not out:
+            out = "전투는 아직 끝나지 않았고 적의 위협이 남아 있다."
+        else:
+            out = f"{out}\n\n전투는 아직 끝나지 않았고 적의 위협이 남아 있다."
+        return out
+
+    @staticmethod
+    def _resolve_sequence_type(snapshot: Dict[str, Any], fallback: str | None) -> str:
+        metadata = snapshot.get("metadata") or {}
+        hint = ""
+        if isinstance(metadata, dict):
+            hint = str(
+                metadata.get("sequence_type")
+                or metadata.get("phase_type")
+                or metadata.get("type")
+                or ""
+            )
+        if not hint:
+            hint = str(snapshot.get("current_phase") or fallback or "")
+
+        norm = hint.strip().upper()
+        if not norm:
+            return "EXPLORATION"
+
+        if any(k in norm for k in ["COMBAT", "BATTLE", "BOSS", "교전", "결전"]):
+            return "COMBAT"
+        if any(k in norm for k in ["DIALOG", "DIALOGUE", "대화"]):
+            return "DIALOGUE"
+        if any(k in norm for k in ["NEGO", "NEGOTIATION", "협상", "흥정"]):
+            return "NEGO"
+        if any(k in norm for k in ["REST", "휴식"]):
+            return "REST"
+        if any(k in norm for k in ["RECOVERY", "HEAL", "회복"]):
+            return "RECOVERY"
+        if any(k in norm for k in ["INFILTRATION", "STEALTH", "잠입"]):
+            return "EXPLORATION"
+        if any(k in norm for k in ["EXPLORATION", "EXPLORE", "탐색"]):
+            return "EXPLORATION"
+        return "EXPLORATION"
 
     async def get_session_history(self, session_id: str) -> List[Dict[str, Any]]:
         query = self.db.get_query("get_session_history")
@@ -364,8 +493,9 @@ class GameEngine:
             "act_id": snapshot.get("current_act_id") or state.get("act_id"),
             "sequence_id": snapshot.get("current_sequence_id")
             or state.get("sequence_id"),
-            "sequence_type": snapshot.get("current_phase")
-            or state.get("sequence_type"),
+            "sequence_type": self._resolve_sequence_type(
+                snapshot, state.get("sequence_type")
+            ),
             "sequence_seq": snapshot.get("current_turn") or state.get("sequence_seq"),
         }
 
@@ -681,6 +811,55 @@ class GameEngine:
                 elif latest_snapshot:
                     logger.info("   -> Ending session by scenario completion signal")
                     await self.state_client.end_session(session_id)
+            elif not scenario.should_end and not transitioned:
+                # Fallback gate:
+                # When scenario-service misses should_end on terminal sequence,
+                # auto-close only if terminal sequence enemies are all defeated.
+                session_id = state["session_id"]
+                try:
+                    latest_state = await self.state_client.get_state(session_id)
+                    latest_sequence = await self.state_client.get_sequence_details(
+                        session_id
+                    )
+                    act_details = await self.state_client.get_act_details(session_id)
+                except Exception as e:
+                    logger.debug(
+                        "   -> Terminal fallback check skipped. error=%s",
+                        type(e).__name__,
+                    )
+                    latest_state = None
+                    latest_sequence = None
+                    act_details = None
+
+                latest_snapshot = dict(latest_state or {})
+                if isinstance(latest_sequence, dict):
+                    if latest_sequence.get("enemies") is not None:
+                        latest_snapshot["enemies"] = latest_sequence.get("enemies")
+                    if (
+                        not latest_snapshot.get("current_sequence_id")
+                        and latest_sequence.get("sequence_id")
+                    ):
+                        latest_snapshot["current_sequence_id"] = latest_sequence.get(
+                            "sequence_id"
+                        )
+
+                current_seq_id = str(latest_snapshot.get("current_sequence_id") or "")
+                is_terminal_seq = self._is_last_sequence_in_act(
+                    current_seq_id, act_details
+                )
+                total_enemies = self._count_enemies_in_current_sequence(latest_snapshot)
+                has_live_enemies = self._has_live_enemies_in_current_sequence(
+                    latest_snapshot
+                )
+                if is_terminal_seq and total_enemies > 0 and not has_live_enemies:
+                    logger.info(
+                        "   -> Auto-ending session by terminal-state fallback "
+                        "(seq=%s, enemies=%s)",
+                        current_seq_id,
+                        total_enemies,
+                    )
+                    scenario.should_end = True
+                    await self.state_client.end_session(session_id)
 
         return {"commit_id": result["commit_id"]}
 
@@ -691,8 +870,6 @@ class GameEngine:
         scenario = state.get("scenario_suggestion")
         if not scenario:
             raise ValueError("Scenario suggestion missing")
-
-        required_slot = scenario.narrative_slot
 
         rule_outcome = state.get("rule_outcome")
         if not rule_outcome:
@@ -719,29 +896,63 @@ class GameEngine:
 
         chain = prompt | self.llm
 
+        # Fetch post-commit snapshot for narrative guardrails.
+        snapshot = dict(state.get("world_snapshot", {}) or {})
+        try:
+            latest_state = await self.state_client.get_state(state["session_id"])
+            latest_sequence = await self.state_client.get_sequence_details(
+                state["session_id"]
+            )
+            snapshot = dict(latest_state or {})
+            if isinstance(latest_sequence, dict):
+                if latest_sequence.get("enemies") is not None:
+                    snapshot["enemies"] = latest_sequence.get("enemies")
+                if latest_sequence.get("npcs") is not None:
+                    snapshot["npcs"] = latest_sequence.get("npcs")
+                if latest_sequence.get("items") is not None:
+                    snapshot["items"] = latest_sequence.get("items")
+                if (
+                    not snapshot.get("current_sequence_id")
+                    and latest_sequence.get("sequence_id")
+                ):
+                    snapshot["current_sequence_id"] = latest_sequence.get("sequence_id")
+                if (
+                    not snapshot.get("sequence_name")
+                    and latest_sequence.get("sequence_name")
+                ):
+                    snapshot["sequence_name"] = latest_sequence.get("sequence_name")
+                if latest_sequence.get("location_name"):
+                    snapshot["location_name"] = latest_sequence.get("location_name")
+                if latest_sequence.get("goal"):
+                    snapshot["goal"] = latest_sequence.get("goal")
+        except Exception as e:
+            logger.debug(
+                "narrative_guard_snapshot_refresh_failed error=%s",
+                type(e).__name__,
+            )
+
+        has_live_enemies = self._has_live_enemies_in_current_sequence(snapshot)
+        session_ended = str(snapshot.get("status", "")).lower() == "ended"
+
         # Fetch history for context
         history = await self._fetch_history(state["session_id"], limit=5)
         narrative = ""
-        required_phrases: list[str] = []
-        if required_slot:
-            required_phrases.append(str(required_slot))
-        if scenario.should_end:
-            # Ensure terminal narration is explicit for downstream validation.
-            required_phrases.append("모험은 끝이 났다.")
 
-        required_narrative_instruction = ""
-        if required_phrases:
-            joined = "\n".join(f"- {p}" for p in required_phrases)
-            required_narrative_instruction = (
-                "\n[필수 포함 내용]"
-                "\n아래 문장을 서술의 마지막이나 적절한 위치에 "
-                "'토씨 하나 틀리지 말고' 그대로 포함하십시오:\n"
-                f"{joined}"
+        forbidden_narrative_instruction = ""
+        if has_live_enemies:
+            forbidden_narrative_instruction = (
+                "\n[금지 표현]\n"
+                "현재 시퀀스에 생존 적이 남아 있다. 아래와 같은 종료/완료 선언은 절대 쓰지 마라:\n"
+                "- 모험은 끝이 났다.\n"
+                "- 작전이 성공적으로 마무리되었다.\n"
+                "- 모든 적이 쓰러졌다.\n"
+                "- 봉인이 완전히 안정화되었다.\n"
+                "- 마지막 남은 적/핵심 적을 처치했다는 단정.\n"
+                "- 승리를 확신하거나 전투 종료를 기정사실화하는 표현.\n"
             )
 
-        for _ in range(max_retries):
+        for attempt_idx in range(max_retries):
             try:
-                snapshot = state.get("world_snapshot", {}) or {}
                 snapshot_view = {
                     "scenario_id": snapshot.get("scenario_id"),
                     "current_act_id": snapshot.get("current_act_id"),
@@ -749,7 +960,6 @@ class GameEngine:
                     "sequence_name": snapshot.get("sequence_name"),
                     "location_name": snapshot.get("location_name"),
                     "goal": snapshot.get("goal"),
-                    "exit_triggers": snapshot.get("exit_triggers", []),
                     "npcs": [
                         {
                             "id": (
@@ -769,6 +979,15 @@ class GameEngine:
                                 or e.get("enemy_id")
                             ),
                             "name": e.get("name"),
+                            "hp": (
+                                e.get("current_hp")
+                                if e.get("current_hp") is not None
+                                else ((e.get("state") or {}).get("numeric") or {}).get(
+                                    "HP"
+                                )
+                            ),
+                            "is_defeated": bool(e.get("is_defeated")),
+                            "assigned_sequence_id": e.get("assigned_sequence_id"),
                         }
                         for e in snapshot.get("enemies", [])
                     ],
@@ -780,7 +999,8 @@ class GameEngine:
                 context = {
                     "input_text": state["user_input"],
                     "outcome": rule_outcome.model_dump(),
-                    "required_narrative_instruction": required_narrative_instruction,
+                    "required_narrative_instruction": "",
+                    "forbidden_narrative_instruction": forbidden_narrative_instruction,
                     "history": history,
                     "active_entity_id": active_entity,
                     "world_snapshot": json.dumps(snapshot_view, ensure_ascii=False),
@@ -791,14 +1011,29 @@ class GameEngine:
                 raise e
             narrative = response_msg.content
 
-            missing_phrases = [p for p in required_phrases if p not in narrative]
-            if missing_phrases:
+            if has_live_enemies and self._contains_terminal_claim(narrative):
                 logger.warning(
-                    "Narrative missing required phrase(s) %s. Retrying...",
-                    missing_phrases,
+                    "Narrative declared terminal/completion while live enemies remain. "
+                    "Retrying... attempt=%s/%s",
+                    attempt_idx + 1,
+                    max_retries,
                 )
-                continue
+                if attempt_idx < max_retries - 1:
+                    continue
+                live_enemy_count = self._count_live_enemies_in_current_sequence(snapshot)
+                narrative = (
+                    "교전이 계속되고 있다. "
+                    f"현재 시퀀스에는 아직 쓰러지지 않은 적이 {live_enemy_count}명 남아 있다. "
+                    "전투는 아직 끝나지 않았고 적의 위협이 남아 있다."
+                )
+                break
+
             break
+
+        # Do not let LLM decide termination phrasing from transition hints.
+        # Append terminal line only from committed state.
+        if session_ended and not has_live_enemies and "모험은 끝이 났다." not in narrative:
+            narrative = f"{narrative.strip()}\n\n모험은 끝이 났다."
 
         return {"narrative": narrative}
 
