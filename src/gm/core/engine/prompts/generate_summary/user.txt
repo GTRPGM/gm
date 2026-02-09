@@ -2,6 +2,8 @@
 - 시간/장소: {act_name} / {sequence_name}
 - 목표: {goal}
 - 주요 인물/적: {entities}
+- 주요 인물/적 상세(모두 언급해야 함):
+{entities_list}
 - 플레이어 상태: HP {player_hp}
 
 [최근 사건 (History)]

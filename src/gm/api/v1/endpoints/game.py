@@ -7,7 +7,7 @@ from gm.core.deps import get_game_engine
 from gm.core.engine.game_engine import GameEngine
 from gm.exceptions import PipelineError
 from gm.schemas.api import (
-    GameTurnResponse,
+    GameTurnResponseV2,
     HistoryEntry,
     NpcTurnInput,
     SessionSummaryRequest,
@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/turn", response_model=GameTurnResponse)
+@router.post("/turn", response_model=GameTurnResponseV2)
 async def process_turn(
     user_input: UserInput, engine: Annotated[GameEngine, Depends(get_game_engine)]
-) -> GameTurnResponse:
+) -> GameTurnResponseV2:
     try:
         result = await engine.process_player_turn(user_input)
         return result
@@ -40,10 +40,10 @@ async def process_turn(
         ) from e
 
 
-@router.post("/npc-turn", response_model=GameTurnResponse)
+@router.post("/npc-turn", response_model=GameTurnResponseV2)
 async def process_npc_turn(
     input_data: NpcTurnInput, engine: Annotated[GameEngine, Depends(get_game_engine)]
-) -> GameTurnResponse:
+) -> GameTurnResponseV2:
     try:
         result = await engine.process_npc_turn(input_data.session_id)
         return result

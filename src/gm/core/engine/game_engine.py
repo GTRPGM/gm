@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, TypeVar, cast
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from pydantic import BaseModel, Field
 
 from gm.core.models import TurnContext
 from gm.exceptions import PipelineError
@@ -20,7 +21,7 @@ from gm.interfaces.external import (
     StateManagerPort,
 )
 from gm.interfaces.llm import LLMPort
-from gm.schemas.api import ActorType, TurnOutputKind, TurnOutputType
+from gm.schemas.api import ActorType, SegmentType
 from gm.schemas.common import EntityDiff
 
 logger = logging.getLogger(__name__)
@@ -335,6 +336,101 @@ class GameEngine:
         return data if isinstance(data, dict) else None
 
     @staticmethod
+    def _resolve_entity_label_from_snapshot(
+        entity_id: str, snapshot: Dict[str, Any]
+    ) -> str:
+        """Resolve a stable label for an entity_id using a state-manager snapshot."""
+        eid = str(entity_id or "").strip()
+        if not eid:
+            return "unknown"
+
+        player_id = str(snapshot.get("player_id") or "").strip()
+        if player_id and eid == player_id:
+            return "player"
+
+        for npc in snapshot.get("npcs", []) or []:
+            if not isinstance(npc, dict):
+                continue
+            sid = str(npc.get("id") or npc.get("npc_id") or "").strip()
+            if sid and sid == eid:
+                return str(npc.get("name") or "npc")
+
+        for enemy in snapshot.get("enemies", []) or []:
+            if not isinstance(enemy, dict):
+                continue
+            sid = str(enemy.get("id") or enemy.get("enemy_id") or "").strip()
+            if sid and sid == eid:
+                return str(enemy.get("name") or "enemy")
+
+        return eid
+
+    @classmethod
+    def _build_delta_brief(
+        cls,
+        final_diffs: list[EntityDiff] | None,
+        snapshot_before: Dict[str, Any] | None,
+        snapshot_after: Dict[str, Any] | None,
+        active_entity_id: str | None,
+        selected_target_entity_id: str | None,
+    ) -> str:
+        """
+        Build a compact, LLM-safe delta summary.
+        Narrative is required to use ONLY this delta (plus the explicit input/outcome).
+        """
+        before = snapshot_before or {}
+        after = snapshot_after or {}
+        diffs = final_diffs or []
+
+        actor_label = cls._resolve_entity_label_from_snapshot(
+            str(active_entity_id or ""), after or before
+        )
+        target_label = ""
+        if selected_target_entity_id:
+            target_label = cls._resolve_entity_label_from_snapshot(
+                str(selected_target_entity_id), after or before
+            )
+
+        lines: list[str] = []
+        lines.append(f"- actor: {actor_label} (id={active_entity_id})")
+        if selected_target_entity_id:
+            lines.append(f"- target: {target_label} (id={selected_target_entity_id})")
+
+        if not diffs:
+            lines.append("- diffs: (none)")
+            return "\n".join(lines)
+
+        lines.append("- diffs:")
+        for d in diffs:
+            try:
+                eid = str(d.entity_id)
+                label = cls._resolve_entity_label_from_snapshot(eid, after or before)
+                diff_map = d.diff or {}
+            except Exception:
+                continue
+
+            if not isinstance(diff_map, dict) or not diff_map:
+                lines.append(f"  - {label}(id={eid}): (no fields)")
+                continue
+
+            # Keep it short and structured. Prefer numeric deltas.
+            parts: list[str] = []
+            for k, v in diff_map.items():
+                if v is None:
+                    continue
+                if isinstance(v, (int, float)):
+                    sign = "+" if float(v) >= 0 else ""
+                    parts.append(f"{k} {sign}{v}")
+                elif isinstance(v, str):
+                    parts.append(f"{k}={v[:40]}")
+                else:
+                    parts.append(f"{k}=(updated)")
+            if not parts:
+                parts = ["(updated)"]
+            lines.append(f"  - {label}(id={eid}): " + ", ".join(parts[:6]))
+
+        return "\n".join(lines)
+
+    @staticmethod
     def _is_uuid_like(value: str) -> bool:
         try:
             uuid.UUID(str(value))
@@ -587,6 +683,8 @@ class GameEngine:
 
     async def process_player_turn(self, user_input: Any) -> Dict[str, Any]:
         pre_sequence_id: str | None = None
+        pre_act_id: str | None = None
+        pre_status: str | None = None
         try:
             before = await self.state_client.get_state(user_input.session_id)
             pre_sequence_id = (
@@ -594,8 +692,16 @@ class GameEngine:
                 if before.get("current_sequence_id")
                 else None
             )
+            pre_act_id = (
+                str(before.get("current_act_id"))
+                if before.get("current_act_id")
+                else None
+            )
+            pre_status = str(before.get("status")) if before.get("status") else None
         except Exception:
             pre_sequence_id = None
+            pre_act_id = None
+            pre_status = None
 
         player_state = {
             "session_id": user_input.session_id,
@@ -612,24 +718,25 @@ class GameEngine:
 
         player_result_state = await self.graph.ainvoke(player_state)
 
+        player_action = str(user_input.content)
         player_response = {
             "turn_id": player_result_state["turn_id"],
-            "narrative": player_result_state["narrative"],
-            "dialogue": None,
-            "outputs": [
-                {
-                    "kind": TurnOutputKind.NARRATION,
-                    "text": player_result_state["narrative"],
-                    "actor_type": ActorType.NARRATOR,
-                    "actor_id": "narrator",
-                    "actor_name": "narrator",
-                }
-            ],
             "commit_id": player_result_state["commit_id"],
             "active_entity_id": player_result_state.get("active_entity_id", "player"),
             "active_entity_name": "player",
-            "output_type": TurnOutputType.NARRATION,
             "is_npc_turn": False,
+            "segments": [
+                {
+                    "type": SegmentType.ACTION,
+                    "role": "player",
+                    "content": player_action,
+                },
+                {
+                    "type": SegmentType.NARRATION,
+                    "role": "narrator",
+                    "content": player_result_state["narrative"],
+                },
+            ],
         }
 
         # 2. Check if there are active entities (NPCs/Enemies)
@@ -682,10 +789,52 @@ class GameEngine:
             logger.info("No active entities found. Skipping NPC turn.")
             player_response["npc_turn"] = None
 
+        # Attach progression/termination indicators after the full composite turn.
+        try:
+            after = await self.state_client.get_state(user_input.session_id)
+        except Exception:
+            after = latest or {}
+
+        post_act_id = str(after.get("current_act_id") or "") or None
+        post_seq_id = str(after.get("current_sequence_id") or "") or None
+        post_status = str(after.get("status") or "") or None
+        is_ended = (post_status or "").lower() == "ended"
+
+        changed = bool(
+            (pre_act_id and post_act_id and pre_act_id != post_act_id)
+            or (pre_sequence_id and post_seq_id and pre_sequence_id != post_seq_id)
+        )
+        player_response["current_act_id"] = post_act_id
+        player_response["current_sequence_id"] = post_seq_id
+        player_response["session_status"] = post_status
+        player_response["is_session_ended"] = bool(is_ended)
+        player_response["transition"] = {
+            "from_act_id": pre_act_id,
+            "from_sequence_id": pre_sequence_id,
+            "to_act_id": post_act_id,
+            "to_sequence_id": post_seq_id,
+            "from_status": pre_status,
+            "to_status": post_status,
+            "changed": bool(changed),
+        }
+
         return player_response
 
     async def process_npc_turn(self, session_id: str) -> Dict[str, Any]:
         # NPC 턴인 경우 user_input은 그래프 내부의 generate_npc_input 노드에서 생성됨
+        pre_act_id: str | None = None
+        pre_seq_id: str | None = None
+        pre_status: str | None = None
+        try:
+            before = await self.state_client.get_state(session_id)
+            pre_act_id = str(before.get("current_act_id") or "") or None
+            pre_seq_id = str(before.get("current_sequence_id") or "") or None
+            pre_status = str(before.get("status") or "") or None
+        except Exception:
+            pre_act_id = None
+            pre_seq_id = None
+            pre_status = None
+
         initial_state = {
             "session_id": session_id,
             "user_input": "",  # 그래프 내부에서 생성될 예정
@@ -698,53 +847,76 @@ class GameEngine:
         # 그래프 비동기 실행
         final_state = await self.graph.ainvoke(initial_state)
 
-        output_type = (
-            TurnOutputType.NARRATION
-            if str(final_state.get("active_entity_id", "")).lower() == "narrator"
-            else TurnOutputType.NPC
+        try:
+            after = await self.state_client.get_state(session_id)
+        except Exception:
+            after = {}
+
+        post_act_id = str(after.get("current_act_id") or "") or None
+        post_seq_id = str(after.get("current_sequence_id") or "") or None
+        post_status = str(after.get("status") or "") or None
+        changed = bool(
+            (pre_act_id and post_act_id and pre_act_id != post_act_id)
+            or (pre_seq_id and post_seq_id and pre_seq_id != post_seq_id)
         )
+
         active_entity_id = final_state.get("active_entity_id")
         active_entity_name = self._resolve_active_entity_name(
             final_state.get("world_snapshot", {}) or {},
             active_entity_id,
         )
-        snapshot = final_state.get("world_snapshot", {}) or {}
-        actor_type = self._resolve_actor_type(snapshot, active_entity_id)
         dialogue = final_state.get("npc_dialogue")
+        action = str(final_state.get("user_input") or "").strip() or None
+        if str(active_entity_id or "").lower() == "narrator":
+            action = None
 
-        # Client-friendly ordering for NPC/enemy turns:
-        # show spoken line first, then narration of what happened.
-        outputs: list[dict[str, Any]] = []
-        if dialogue:
-            outputs.append(
+        segments: list[dict[str, Any]] = []
+        if action:
+            segments.append(
                 {
-                    "kind": TurnOutputKind.DIALOGUE,
-                    "text": str(dialogue),
-                    "actor_type": actor_type,
-                    "actor_id": active_entity_id,
-                    "actor_name": active_entity_name,
+                    "type": SegmentType.ACTION,
+                    "role": active_entity_name,
+                    "content": str(action),
                 }
             )
-        outputs.append(
+        if dialogue:
+            segments.append(
+                {
+                    "type": SegmentType.DIALOGUE,
+                    "role": active_entity_name,
+                    "content": str(dialogue),
+                }
+            )
+        segments.append(
             {
-                "kind": TurnOutputKind.NARRATION,
-                "text": final_state["narrative"],
-                "actor_type": ActorType.NARRATOR,
-                "actor_id": "narrator",
-                "actor_name": "narrator",
+                "type": SegmentType.NARRATION,
+                "role": "narrator",
+                "content": str(final_state["narrative"]),
             }
         )
 
         return {
             "turn_id": final_state["turn_id"],
-            "narrative": final_state["narrative"],
-            "dialogue": dialogue,
-            "outputs": outputs,
             "commit_id": final_state["commit_id"],
-            "active_entity_id": active_entity_id,  # Return who acted
+            "active_entity_id": active_entity_id,
             "active_entity_name": active_entity_name,
-            "output_type": output_type,
+            "segments": segments,
             "is_npc_turn": True,
+            # Post state context for clients that want to
+            # render transitions even on npc-turn calls.
+            "current_act_id": post_act_id,
+            "current_sequence_id": post_seq_id,
+            "session_status": post_status,
+            "is_session_ended": bool((post_status or "").lower() == "ended"),
+            "transition": {
+                "from_act_id": pre_act_id,
+                "from_sequence_id": pre_seq_id,
+                "to_act_id": post_act_id,
+                "to_sequence_id": post_seq_id,
+                "from_status": pre_status,
+                "to_status": post_status,
+                "changed": bool(changed),
+            },
         }
 
     async def _fetch_history(
@@ -1344,6 +1516,20 @@ class GameEngine:
         )
 
         chain = prompt | self.llm
+        structured_llm = None
+
+        class _SegmentOut(BaseModel):
+            type: str = Field(..., description="narration|dialogue")
+            role: str = Field(..., description="speaker label")
+            content: str = Field(..., description="text content")
+
+        class _NarrativeOut(BaseModel):
+            segments: list[_SegmentOut] = Field(default_factory=list)
+
+        try:
+            structured_llm = self.llm.with_structured_output(_NarrativeOut)
+        except Exception:
+            structured_llm = None
 
         # Fetch post-commit snapshot for narrative guardrails.
         snapshot = dict(state.get("world_snapshot", {}) or {})
@@ -1388,6 +1574,13 @@ class GameEngine:
         # Fetch history for context
         history = await self._fetch_history(state["session_id"], limit=5)
         narrative = ""
+        delta_brief = self._build_delta_brief(
+            final_diffs=state.get("final_diffs", []),
+            snapshot_before=state.get("world_snapshot", {}) or {},
+            snapshot_after=snapshot,
+            active_entity_id=active_entity,
+            selected_target_entity_id=state.get("selected_target_entity_id"),
+        )
 
         forbidden_narrative_instruction = ""
         if has_live_enemies:
@@ -1469,19 +1662,65 @@ class GameEngine:
                     "forbidden_narrative_instruction": forbidden_narrative_instruction,
                     "history": history,
                     "active_entity_id": active_entity,
+                    "delta_brief": delta_brief,
                     "world_snapshot": json.dumps(snapshot_view, ensure_ascii=False),
                 }
-                response_msg = await chain.ainvoke(context)
+                segments: list[_SegmentOut] = []
+                if structured_llm is not None:
+                    try:
+                        messages = prompt.format_messages(**context)
+                        out: _NarrativeOut = await structured_llm.ainvoke(messages)
+                        segments = out.segments or []
+                    except Exception:
+                        segments = []
+
+                if not segments:
+                    response_msg = await chain.ainvoke(context)
+                    raw = str(response_msg.content or "")
+                    parsed = self._extract_first_json_object(raw)
+                    if isinstance(parsed, dict) and isinstance(
+                        parsed.get("segments"), list
+                    ):
+                        for seg in parsed["segments"]:
+                            if not isinstance(seg, dict):
+                                continue
+                            segments.append(
+                                _SegmentOut(
+                                    type=str(seg.get("type") or ""),
+                                    role=str(seg.get("role") or ""),
+                                    content=str(seg.get("content") or ""),
+                                )
+                            )
+                    if not segments:
+                        segments = [
+                            _SegmentOut(type="narration", role="narrator", content=raw)
+                        ]
             except Exception as e:
                 logger.exception("Error during narrative generation ainvoke")
                 raise e
-            narrative = response_msg.content
+
+            dialogue_candidate = None
+            narration_texts: list[str] = []
+            for seg in segments:
+                seg_type = str(seg.type or "").strip().lower()
+                seg_role = str(seg.role or "").strip() or "narrator"
+                seg_content = str(seg.content or "").strip()
+                if not seg_content:
+                    continue
+                if seg_type == "dialogue" and dialogue_candidate is None:
+                    dialogue_candidate = (seg_role, seg_content)
+                elif seg_type == "narration":
+                    narration_texts.append(seg_content)
+
+            if not narration_texts:
+                narration_texts = ["(행동 결과가 확정되지 않았다.)"]
+            narrative = "\n".join(narration_texts).strip()
 
             # NPC/ENEMY 턴인데 2인칭이 섞이면 재시도한다.
             if (
                 state.get("is_npc_turn")
                 and actor_type in (ActorType.NPC, ActorType.ENEMY)
-                and re.search(r"\\b당신", narrative)
+                and "당신" in str(narrative)
             ):
                 logger.warning(
                     "NPC narrative used 2nd-person pronoun. Retrying... attempt=%s/%s",
@@ -1517,6 +1756,15 @@ class GameEngine:
 
             break
 
+        updates: dict[str, Any] = {"narrative": narrative}
+        if (
+            state.get("is_npc_turn")
+            and dialogue_candidate
+            and not state.get("npc_dialogue")
+        ):
+            _role, _content = dialogue_candidate
+            updates["npc_dialogue"] = _content.strip() or None
+
         # Do not let LLM decide termination phrasing from transition hints.
         # Append terminal line only from committed state.
         if (
@@ -1526,7 +1774,8 @@ class GameEngine:
         ):
             narrative = f"{narrative.strip()}\n\n모험은 끝이 났다."
 
-        return {"narrative": narrative}
+        updates["narrative"] = narrative
+        return updates
 
     @log_node_execution
     async def save_log(self, state: TurnContext) -> TurnContext:
@@ -1577,18 +1826,53 @@ class GameEngine:
                 act_details = {}
             snapshot["act"] = act_details if isinstance(act_details, dict) else {}
 
-            # Entities list string
-            entities = []
+            # Entities (NPC + enemy). We keep a structured list for guardrails:
+            # summary must mention every present entity by name.
+            entity_items: list[dict[str, str]] = []
             for npc in snapshot.get("npcs", []):
-                name = npc.get("name", "Unknown")
-                desc = npc.get("description", "")[:30]
-                entities.append(f"{name}({desc})")
+                name = (npc.get("name") or "Unknown").strip()
+                desc = (npc.get("description") or "").strip()
+                entity_items.append(
+                    {
+                        "kind": "npc",
+                        "name": name,
+                        "description": desc[:80],
+                    }
+                )
             for enemy in snapshot.get("enemies", []):
-                name = enemy.get("name", "Unknown")
-                desc = enemy.get("description", "")[:30]
-                entities.append(f"{name}({desc})")
+                name = (enemy.get("name") or "Unknown").strip()
+                desc = (enemy.get("description") or "").strip()
+                entity_items.append(
+                    {
+                        "kind": "enemy",
+                        "name": name,
+                        "description": desc[:80],
+                    }
+                )
 
-            entity_str = ", ".join(entities) if entities else "없음"
+            entity_str = (
+                ", ".join(
+                    [
+                        f"{it['name']}({(it['description'] or '')[:30]})"
+                        for it in entity_items
+                    ]
+                )
+                if entity_items
+                else "없음"
+            )
+            entities_list_text = (
+                "\n".join(
+                    [
+                        (
+                            f"- [{it['kind']}] "
+                            f"{it['name']}: {it['description'] or '(설명 없음)'}"
+                        )
+                        for it in entity_items
+                    ]
+                )
+                if entity_items
+                else "- (없음)"
+            )
 
         except Exception as e:
             logger.error(f"Failed to fetch state for summary: {e}")
@@ -1626,11 +1910,33 @@ class GameEngine:
                     "sequence_name": snapshot.get("sequence_name", "Unknown"),
                     "goal": snapshot.get("goal", "생존"),
                     "entities": entity_str,
+                    "entities_list": entities_list_text,
                     "player_hp": snapshot.get("player", {}).get("hp", "?"),
                     "history": history_text,
                 }
             )
-            return response_msg.content
+            summary = (response_msg.content or "").strip()
+
+            # Guardrail: ensure all present entity names are
+            # explicitly mentioned in the summary.
+            # If the LLM omits some, we append a deterministic
+            # "등장 NPC/적" section so the
+            # player always gets a complete cast snapshot.
+            if entity_items and summary:
+                summary_lc = summary.lower()
+                missing = [
+                    it
+                    for it in entity_items
+                    if it["name"] and it["name"].lower() not in summary_lc
+                ]
+                if missing:
+                    lines = ["", "등장 NPC/적:"]
+                    for it in missing:
+                        desc = it["description"] or "(설명 없음)"
+                        lines.append(f"- {it['name']}: {desc}")
+                    summary = summary + "\n" + "\n".join(lines).strip()
+
+            return summary or "상황 요약을 생성하지 못했습니다."
         except Exception as e:
             logger.error(f"Summary generation failed: {e}")
             return "상황 요약을 생성하는 도중 오류가 발생했습니다."
