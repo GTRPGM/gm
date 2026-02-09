@@ -22,9 +22,9 @@ from gm.interfaces.external import (
 )
 from gm.interfaces.llm import LLMPort
 from gm.schemas.api import ActorType, SegmentType
-from gm.schemas.common import EntityDiff
+from gm.schemas.common import EntityDiff, RelationDiff
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 # Node to Service mapping for error reporting
 NODE_SERVICE_MAP = {
@@ -763,31 +763,73 @@ class GameEngine:
         )
 
         # 3. Process NPC Turn if entities exist.
-        # 이전에는 시퀀스 전이가 발생하면 NPC 턴을 스킵했는데,
-        # 그 결과 적/ NPC가 "아예 행동하지 않는" 심각한 상태가 발생했다.
-        # 전이가 발생한 경우에도, 전이 이후 시퀀스의 엔티티가 존재한다면
-        # 해당 시퀀스 기준으로 NPC/적 턴을 1회 실행한다.
+        npc_responses = []
+        run_npc_turn = False
+
         if entities and not should_end and not sequence_transitioned:
-            logger.info(f"Active entities found: {entities}. Proceeding to NPC turn.")
-            npc_response = await self.process_npc_turn(user_input.session_id)
-            player_response["npc_turn"] = npc_response
+            logger.info(f"Active entities found: {entities}. Proceeding to NPC turns.")
+            run_npc_turn = True
         elif entities and not should_end and sequence_transitioned:
             logger.info(
                 (
                     "Sequence transitioned (%s -> %s). "
-                    "Running NPC turn on the transitioned sequence."
+                    "Running NPC turns on the transitioned sequence."
                 ),
                 pre_sequence_id,
                 post_sequence_id,
             )
-            npc_response = await self.process_npc_turn(user_input.session_id)
-            player_response["npc_turn"] = npc_response
+            run_npc_turn = True
         elif entities and should_end:
             logger.info("Session already ended. Skipping NPC turn.")
-            player_response["npc_turn"] = None
         else:
             logger.info("No active entities found. Skipping NPC turn.")
-            player_response["npc_turn"] = None
+
+        if run_npc_turn:
+            pools = self._build_actor_pool(snapshot)
+            execution_queue = []
+
+            # Priority: Alive Enemies -> Active NPCs
+            for e in pools.get("enemies", []):
+                if e.get("alive"):
+                    execution_queue.append(e["scenario_id"])
+
+            for n in pools.get("npcs", []):
+                # NPCs are usually considered active if present (not departed)
+                execution_queue.append(n["scenario_id"])
+
+            if not execution_queue:
+                # Fallback: If entities exist but no valid actors found (e.g. all dead/departed),
+                # run a single generic turn (likely Narrator) to describe the aftermath.
+                logger.info(
+                    "Entities exist but no valid actors found. Running generic Narrator turn."
+                )
+                try:
+                    # process_npc_turn without force_id will select Narrator via select_active_entity fallback
+                    res = await self.process_npc_turn(user_input.session_id)
+                    npc_responses.append(res)
+                except Exception as e:
+                    logger.error(f"Error in fallback narrator turn: {e}")
+            else:
+                logger.info(f"Executing NPC turns for queue: {execution_queue}")
+                for aid in execution_queue:
+                    try:
+                        res = await self.process_npc_turn(
+                            user_input.session_id, force_active_entity_id=aid
+                        )
+                        npc_responses.append(res)
+
+                        # Stop if session ended
+                        if (
+                            res.get("is_session_ended")
+                            or str(res.get("session_status", "")).lower() == "ended"
+                        ):
+                            logger.info("Session ended during NPC turn loop. Stopping.")
+                            break
+                    except Exception as e:
+                        logger.error(f"Error executing turn for {aid}: {e}")
+
+        player_response["npc_turns"] = npc_responses
+        player_response["npc_turn"] = npc_responses[0] if npc_responses else None
 
         # Attach progression/termination indicators after the full composite turn.
         try:
@@ -820,7 +862,9 @@ class GameEngine:
 
         return player_response
 
-    async def process_npc_turn(self, session_id: str) -> Dict[str, Any]:
+    async def process_npc_turn(
+        self, session_id: str, force_active_entity_id: str | None = None
+    ) -> Dict[str, Any]:
         # NPC 턴인 경우 user_input은 그래프 내부의 generate_npc_input 노드에서 생성됨
         pre_act_id: str | None = None
         pre_seq_id: str | None = None
@@ -842,6 +886,7 @@ class GameEngine:
             # Context defaults (will be overridden by fetch_state)
             "active_entity_id": "npc_pending",
             "sequence_type": "EXPLORATION",
+            "force_active_entity_id": force_active_entity_id,
         }
 
         # 그래프 비동기 실행
@@ -1021,6 +1066,51 @@ class GameEngine:
             return {"active_entity_id": "player"}
 
         snapshot = state.get("world_snapshot", {}) or {}
+        forced_id = state.get("force_active_entity_id")
+
+        if forced_id:
+            # Validate forced ID existence/liveness in current snapshot
+            # Simplified check: just verify if the ID exists in known entities
+            # We don't strictly check 'alive' here because dead entities might have final words?
+            # But usually we only force alive ones.
+            # If the ID is completely unknown, fallback to narrator.
+
+            # Check NPCs
+            found = False
+            for n in snapshot.get("npcs", []) or []:
+                if not isinstance(n, dict):
+                    continue
+                if str(
+                    n.get("scenario_entity_id")
+                    or n.get("scenario_npc_id")
+                    or n.get("npc_id")
+                    or ""
+                ).strip() == str(forced_id):
+                    found = True
+                    break
+
+            if not found:
+                for e in snapshot.get("enemies", []) or []:
+                    if not isinstance(e, dict):
+                        continue
+                    if str(
+                        e.get("scenario_entity_id")
+                        or e.get("scenario_enemy_id")
+                        or e.get("enemy_id")
+                        or ""
+                    ).strip() == str(forced_id):
+                        found = True
+                        break
+
+            if found:
+                logger.info(f"   -> Forced Actor Selection: {forced_id}")
+                return {"active_entity_id": forced_id}
+            else:
+                logger.warning(
+                    f"   -> Forced Actor {forced_id} not found in snapshot. Fallback to Narrator."
+                )
+                return {"active_entity_id": "narrator"}
+
         seq_type = str(state.get("sequence_type") or "EXPLORATION").upper()
 
         pools = self._build_actor_pool(snapshot)
@@ -1340,12 +1430,32 @@ class GameEngine:
                 else:
                     resolved_diffs_map[eid][field] = s_val
 
+        # Permission denied 방지를 위해 파일 로깅 제거 후 logger 사용
+        logger.info(
+            "resolve_conflicts rule_relations=%s scenario_correction=%s",
+            len(rule.suggested.relations),
+            len(scenario.correction_diffs),
+        )
         final_diffs = [
             EntityDiff(entity_id=eid, diff=diff)
             for eid, diff in resolved_diffs_map.items()
         ]
+        final_relations = [
+            RelationDiff(
+                cause_entity_id=str(rel.cause_entity_id),
+                effect_entity_id=str(rel.effect_entity_id),
+                type=str(rel.type),
+                affinity_score=rel.affinity_score,
+                quantity=rel.quantity,
+            )
+            for rel in rule.suggested.relations
+        ]
+        logger.info(
+            "   -> final_relations payload=%s",
+            [r.model_dump() for r in final_relations],
+        )
 
-        return {"final_diffs": final_diffs}
+        return {"final_diffs": final_diffs, "final_relations": final_relations}
 
     @log_node_execution
     async def commit_state(self, state: TurnContext) -> TurnContext:
@@ -1363,7 +1473,8 @@ class GameEngine:
         logger.info("   -> final_diffs count=%s", len(final_diffs))
 
         # 1. Commit entity diffs
-        result = await self.state_client.commit(turn_id, final_diffs)
+        final_relations = state.get("final_relations") or []
+        result = await self.state_client.commit(turn_id, final_diffs, final_relations)
 
         # 2. Handle Location Transition (Act/Sequence Jump) from Scenario Service
         scenario = state.get("scenario_suggestion")

@@ -16,7 +16,7 @@ from gm.interfaces.external import (
     ScenarioManagerPort,
     StateManagerPort,
 )
-from gm.schemas.common import EntityDiff
+from gm.schemas.common import EntityDiff, RelationDiff
 from gm.schemas.rule_engine import (
     RuleOutcome,
     RuleRequestEntity,
@@ -141,6 +141,7 @@ class RuleManagerHTTPClient(RuleManagerPort):
     @retry_policy
     async def get_proposal(self, context: Dict[str, Any]) -> RuleOutcome:
         url = f"{settings.RULE_ENGINE_URL}/play/scenario"
+        logger.debug(f"Requesting Rule Check at {url}")
 
         # Construct payload from context
         session_id = str(context.get("session_id", ""))
@@ -166,7 +167,14 @@ class RuleManagerHTTPClient(RuleManagerPort):
         master_to_instance = {}
 
         player_id = snapshot.get("player_id")
-        player_name = snapshot.get("player_name") or snapshot.get("name") or "Player"
+        if not player_id and isinstance(snapshot.get("session"), dict):
+            player_id = snapshot["session"].get("player_id")
+
+        player_name = snapshot.get("player_name") or snapshot.get("name")
+        if not player_name and isinstance(snapshot.get("player"), dict):
+            player_name = snapshot["player"].get("name")
+        if not player_name:
+            player_name = "Player"
 
         active_entity_id = context.get("active_entity_id")
 
@@ -187,6 +195,7 @@ class RuleManagerHTTPClient(RuleManagerPort):
                 npc.get("scenario_entity_id")
                 or npc.get("scenario_npc_id")
                 or npc.get("npc_id")
+                or npc.get("id")
             )
             s_id = str(npc.get("id") or npc.get("npc_id") or "")
             rule_id_val = parse_positive_int(npc.get("rule_id"))
@@ -199,19 +208,20 @@ class RuleManagerHTTPClient(RuleManagerPort):
                 RuleRequestEntity(
                     state_entity_id=s_id,
                     entity_id=entity_id,
-                    entity_name=str(npc.get("name")),
+                    entity_name=str(npc.get("name") or "NPC"),
                     entity_type="npc",
                     phase_id=phase_id,
                 )
             )
             if m_id:
-                master_to_instance[m_id] = s_id
+                master_to_instance[str(m_id)] = s_id
 
         for enemy in snapshot.get("enemies", []):
             m_id = (
                 enemy.get("scenario_entity_id")
                 or enemy.get("scenario_enemy_id")
                 or enemy.get("enemy_id")
+                or enemy.get("id")
             )
             s_id = str(enemy.get("id") or enemy.get("enemy_id") or "")
             rule_id_val = parse_positive_int(enemy.get("rule_id"))
@@ -224,13 +234,13 @@ class RuleManagerHTTPClient(RuleManagerPort):
                 RuleRequestEntity(
                     state_entity_id=s_id,
                     entity_id=entity_id,
-                    entity_name=str(enemy.get("name")),
+                    entity_name=str(enemy.get("name") or "Enemy"),
                     entity_type="enemy",
                     phase_id=phase_id,
                 )
             )
             if m_id:
-                master_to_instance[m_id] = s_id
+                master_to_instance[str(m_id)] = s_id
 
         actual_active_id = master_to_instance.get(active_entity_id, active_entity_id)
         if not actual_active_id and player_id:
@@ -255,10 +265,14 @@ class RuleManagerHTTPClient(RuleManagerPort):
             str(actual_active_id or ""),
         )
 
+        relations_source = snapshot.get("relations")
+        if not relations_source:
+            relations_source = snapshot.get("entity_relations", [])
+
         req_relations = []
         valid_entity_ids = {e.state_entity_id for e in req_entities}
 
-        for rel in snapshot.get("entity_relations", []):
+        for rel in relations_source:
             r_type = rel.get("relation_type", "NEUTRAL")
             mapped_type = self.RELATION_MAP.get(r_type, "중립적")
 
@@ -280,21 +294,37 @@ class RuleManagerHTTPClient(RuleManagerPort):
                     "effect_entity_id": str(to_s_id),
                     "type": mapped_type,
                     "affinity_score": rel.get("affinity"),
+                    "quantity": rel.get("quantity"),
                 }
             )
 
-        for rel in snapshot.get("player_npc_relations", []):
+        player_rels = snapshot.get("player_npc_relations")
+        if player_rels is None:
+            player_rels = snapshot.get("player_relations", [])
+
+        for rel in player_rels:
             if player_id:
                 r_type = rel.get("relation_type", "NEUTRAL")
                 mapped_type = self.RELATION_MAP.get(r_type, "중립적")
-                npc_s_id = str(rel.get("npc_id"))
+                npc_s_id = str(rel.get("npc_id") or rel.get("id") or "")
+                if not npc_s_id:
+                    continue
+
+                # Rule Engine only needs relations for entities present in the request
+                if str(npc_s_id) not in valid_entity_ids:
+                    continue
+
+                affinity_val = rel.get("affinity_score")
+                if affinity_val is None:
+                    affinity_val = rel.get("affinity")
 
                 req_relations.append(
                     {
                         "cause_entity_id": str(player_id),
                         "effect_entity_id": npc_s_id,
                         "type": mapped_type,
-                        "affinity_score": rel.get("affinity_score"),
+                        "affinity_score": affinity_val,
+                        "quantity": rel.get("quantity"),
                     }
                 )
 
@@ -454,9 +484,20 @@ class ScenarioManagerHTTPClient(ScenarioManagerPort):
 
 class StateManagerHTTPClient(StateManagerPort):
     @retry_policy
-    async def commit(self, turn_id: str, diffs: list[EntityDiff]) -> Dict[str, Any]:
+    async def commit(
+        self,
+        turn_id: str,
+        diffs: list[EntityDiff],
+        relations: list[RelationDiff] | None = None,
+    ) -> Dict[str, Any]:
         url = f"{settings.STATE_MANAGER_URL}/state/commit"
-        payload = {"turn_id": turn_id, "diffs": [d.model_dump() for d in diffs]}
+        commit_payload = [d.model_dump() for d in diffs]
+        update_payload: dict[str, object] = {"diffs": commit_payload}
+        if relations:
+            update_payload["relations"] = [r.model_dump() for r in relations]
+        payload = {"turn_id": turn_id, "update": update_payload}
+        if commit_payload:
+            payload["diffs"] = commit_payload
 
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, timeout=10.0)

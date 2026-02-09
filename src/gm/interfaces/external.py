@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from gm.schemas.common import EntityDiff
+from gm.schemas.common import EntityDiff, RelationDiff
 from gm.schemas.rule_engine import RuleOutcome
 from gm.schemas.scenario import ScenarioSuggestion
 
@@ -28,7 +28,12 @@ class ScenarioManagerPort(ABC):
 
 class StateManagerPort(ABC):
     @abstractmethod
-    async def commit(self, turn_id: str, diffs: List[EntityDiff]) -> Dict[str, Any]:
+    async def commit(
+        self,
+        turn_id: str,
+        diffs: List[EntityDiff],
+        relations: Optional[List[RelationDiff]] = None,
+    ) -> Dict[str, Any]:
         pass
 
     @abstractmethod

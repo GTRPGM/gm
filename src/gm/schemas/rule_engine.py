@@ -17,6 +17,8 @@ class RuleRequestRelation(BaseModel):
     cause_entity_id: str
     effect_entity_id: str
     type: str
+    affinity_score: Optional[int] = None
+    quantity: Optional[int] = None
 
 
 class RuleCheckRequest(BaseModel):
@@ -41,6 +43,8 @@ class RuleSuggestedRelation(BaseModel):
     cause_entity_id: str
     effect_entity_id: str
     type: str
+    affinity_score: Optional[int] = None
+    quantity: Optional[int] = None
 
 
 class RuleSuggestion(BaseModel):
