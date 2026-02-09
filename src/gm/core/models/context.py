@@ -43,6 +43,7 @@ class TurnContext(TypedDict, total=False):
 
     # --- Output ---
     narrative: Optional[str]
+    npc_dialogue: Optional[str]
 
     # --- Internal/Error ---
     error: Optional[str]

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -7,6 +7,27 @@ from pydantic import BaseModel, Field
 class TurnOutputType(str, Enum):
     NPC = "npc"
     NARRATION = "narration"
+
+
+class TurnOutputKind(str, Enum):
+    NARRATION = "narration"
+    DIALOGUE = "dialogue"
+
+
+class ActorType(str, Enum):
+    PLAYER = "player"
+    NARRATOR = "narrator"
+    NPC = "npc"
+    ENEMY = "enemy"
+    UNKNOWN = "unknown"
+
+
+class TurnOutput(BaseModel):
+    kind: TurnOutputKind = Field(..., description="출력 종류 (나레이션/대사)")
+    text: str = Field(..., description="출력 텍스트")
+    actor_type: ActorType = Field(..., description="출력 주체 타입")
+    actor_id: Optional[str] = Field(None, description="출력 주체 ID")
+    actor_name: Optional[str] = Field(None, description="출력 주체 표시 이름")
 
 
 class UserInput(BaseModel):
@@ -27,6 +48,21 @@ class GameTurnResponse(BaseModel):
 
     turn_id: str = Field(..., description="턴 식별자 (session_id:seq)")
     narrative: str = Field(..., description="생성된 서사 내용")
+    dialogue: Optional[str] = Field(
+        None,
+        description=(
+            "NPC/적의 직접 발화(대사). "
+            "행동(action)은 응답 필드로 노출하지 않고 "
+            "나레이션 생성 입력으로만 사용한다."
+        ),
+    )
+    outputs: List[TurnOutput] = Field(
+        default_factory=list,
+        description=(
+            "나레이션/대사 등 출력 조각 리스트. "
+            "클라이언트는 kind로 구분해서 렌더링할 수 있다."
+        ),
+    )
     commit_id: Optional[str] = Field(None, description="상태 확정 ID")
     active_entity_id: Optional[str] = Field(
         "player", description="현재 행동을 수행한 엔티티 ID"

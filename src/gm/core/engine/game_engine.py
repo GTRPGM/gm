@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import uuid
 from typing import Any, Callable, Dict, List, TypeVar, cast
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -19,7 +20,7 @@ from gm.interfaces.external import (
     StateManagerPort,
 )
 from gm.interfaces.llm import LLMPort
-from gm.schemas.api import TurnOutputType
+from gm.schemas.api import ActorType, TurnOutputKind, TurnOutputType
 from gm.schemas.common import EntityDiff
 
 logger = logging.getLogger(__name__)
@@ -143,6 +144,47 @@ class GameEngine:
         return actor or "unknown"
 
     @staticmethod
+    def _resolve_actor_type(
+        snapshot: Dict[str, Any], active_entity_id: str | None
+    ) -> ActorType:
+        actor = (active_entity_id or "").strip()
+        actor_l = actor.lower()
+        if actor_l == "player":
+            return ActorType.PLAYER
+        if actor_l == "narrator":
+            return ActorType.NARRATOR
+
+        for npc in snapshot.get("npcs", []) or []:
+            if not isinstance(npc, dict):
+                continue
+            candidate_ids = [
+                npc.get("scenario_entity_id"),
+                npc.get("entity_id"),
+                npc.get("scenario_npc_id"),
+                npc.get("npc_id"),
+                npc.get("id"),
+            ]
+            candidate_ids_l = {str(v).lower() for v in candidate_ids if v}
+            if actor_l and actor_l in candidate_ids_l:
+                return ActorType.NPC
+
+        for enemy in snapshot.get("enemies", []) or []:
+            if not isinstance(enemy, dict):
+                continue
+            candidate_ids = [
+                enemy.get("scenario_entity_id"),
+                enemy.get("entity_id"),
+                enemy.get("scenario_enemy_id"),
+                enemy.get("enemy_id"),
+                enemy.get("id"),
+            ]
+            candidate_ids_l = {str(v).lower() for v in candidate_ids if v}
+            if actor_l and actor_l in candidate_ids_l:
+                return ActorType.ENEMY
+
+        return ActorType.UNKNOWN
+
+    @staticmethod
     def _has_live_enemies_in_current_sequence(snapshot: Dict[str, Any]) -> bool:
         current_seq_id = str(snapshot.get("current_sequence_id") or "")
         enemies = snapshot.get("enemies", []) or []
@@ -251,6 +293,130 @@ class GameEngine:
     def _normalize_match_text(value: str) -> str:
         return re.sub(r"[^0-9a-z가-힣]+", "", str(value).lower())
 
+    @staticmethod
+    def _extract_first_quoted_dialogue(text: str) -> str | None:
+        """
+        Best-effort dialogue extraction for fallback paths.
+        Extract first quoted string using common quote styles.
+        """
+        if not text:
+            return None
+        src = str(text)
+        patterns = [
+            r"\"([^\"]{1,200})\"",
+            r"“([^”]{1,200})”",
+            r"‘([^’]{1,200})’",
+            r"「([^」]{1,200})」",
+            r"『([^』]{1,200})』",
+        ]
+        for pat in patterns:
+            m = re.search(pat, src)
+            if m:
+                cand = (m.group(1) or "").strip()
+                if cand:
+                    return cand
+        return None
+
+    @staticmethod
+    def _extract_first_json_object(text: str) -> dict[str, Any] | None:
+        """Best-effort JSON object extraction from an LLM response."""
+        if not text:
+            return None
+        src = str(text).strip()
+        start = src.find("{")
+        end = src.rfind("}")
+        if start < 0 or end < 0 or end <= start:
+            return None
+        snippet = src[start : end + 1]
+        try:
+            data = json.loads(snippet)
+        except Exception:
+            return None
+        return data if isinstance(data, dict) else None
+
+    @staticmethod
+    def _is_uuid_like(value: str) -> bool:
+        try:
+            uuid.UUID(str(value))
+            return True
+        except Exception:
+            return False
+
+    @classmethod
+    def _pick_deterministic(cls, seed: str, pool: list[str]) -> str:
+        if not pool:
+            return "narrator"
+        seed_hex = hashlib.sha256(seed.encode("utf-8")).hexdigest()
+        idx = int(seed_hex[:8], 16) % len(pool)
+        return pool[idx]
+
+    @classmethod
+    def _build_actor_pool(
+        cls, snapshot: Dict[str, Any]
+    ) -> dict[str, list[dict[str, Any]]]:
+        npcs_raw = snapshot.get("npcs", []) or []
+        enemies_raw = snapshot.get("enemies", []) or []
+
+        npcs: list[dict[str, Any]] = []
+        for n in npcs_raw:
+            if not isinstance(n, dict):
+                continue
+            scenario_id = (
+                n.get("scenario_entity_id")
+                or n.get("scenario_npc_id")
+                or n.get("npc_id")
+                or n.get("id")
+            )
+            state_id = n.get("id") or n.get("npc_id")
+            name = n.get("name")
+            # NPC can "depart" in some schemas
+            if bool(n.get("is_departed")):
+                continue
+            if scenario_id:
+                npcs.append(
+                    {
+                        "scenario_id": str(scenario_id),
+                        "state_id": str(state_id) if state_id else None,
+                        "name": str(name) if name else None,
+                        "alive": True,
+                    }
+                )
+
+        enemies: list[dict[str, Any]] = []
+        for e in enemies_raw:
+            if not isinstance(e, dict):
+                continue
+            scenario_id = (
+                e.get("scenario_entity_id")
+                or e.get("scenario_enemy_id")
+                or e.get("enemy_id")
+                or e.get("id")
+            )
+            state_id = e.get("id") or e.get("enemy_id")
+            name = e.get("name")
+            is_defeated = bool(e.get("is_defeated"))
+            hp = e.get("current_hp")
+            if hp is None:
+                hp = ((e.get("state") or {}).get("numeric") or {}).get("HP")
+            alive = not is_defeated
+            if hp is not None:
+                try:
+                    alive = alive and int(hp) > 0
+                except (TypeError, ValueError):
+                    pass
+
+            if scenario_id:
+                enemies.append(
+                    {
+                        "scenario_id": str(scenario_id),
+                        "state_id": str(state_id) if state_id else None,
+                        "name": str(name) if name else None,
+                        "alive": bool(alive),
+                    }
+                )
+
+        return {"npcs": npcs, "enemies": enemies}
+
     @classmethod
     def _select_turn_target(cls, state: TurnContext) -> tuple[str, str, str]:
         """
@@ -337,6 +503,28 @@ class GameEngine:
         idx = int(seed_hex[:8], 16) % len(pool)
         picked = pool[idx]
         return picked["id"], picked["name"], "random"
+
+    @staticmethod
+    def _select_enemy_default_target(snapshot: Dict[str, Any]) -> tuple[str, str, str]:
+        """
+        For ENEMY actor in COMBAT: default target should be the player.
+        Returns: (target_entity_id, target_name, mode)
+        """
+        player_id = str(snapshot.get("player_id") or "").strip()
+        player_name = str(snapshot.get("player_name") or "player").strip()
+        if player_id:
+            return player_id, player_name, "explicit"
+
+        # Fallback: if player_id is missing, hit any NPC in the same sequence.
+        for npc in snapshot.get("npcs", []) or []:
+            if not isinstance(npc, dict):
+                continue
+            npc_id = str(npc.get("id") or npc.get("npc_id") or "").strip()
+            npc_name = str(npc.get("name") or "npc").strip()
+            if npc_id:
+                return npc_id, npc_name, "explicit"
+
+        return "", "", "none"
 
     @staticmethod
     def _resolve_sequence_type(snapshot: Dict[str, Any], fallback: str | None) -> str:
@@ -427,6 +615,16 @@ class GameEngine:
         player_response = {
             "turn_id": player_result_state["turn_id"],
             "narrative": player_result_state["narrative"],
+            "dialogue": None,
+            "outputs": [
+                {
+                    "kind": TurnOutputKind.NARRATION,
+                    "text": player_result_state["narrative"],
+                    "actor_type": ActorType.NARRATOR,
+                    "actor_id": "narrator",
+                    "actor_name": "narrator",
+                }
+            ],
             "commit_id": player_result_state["commit_id"],
             "active_entity_id": player_result_state.get("active_entity_id", "player"),
             "active_entity_name": "player",
@@ -457,21 +655,26 @@ class GameEngine:
             pre_sequence_id and post_sequence_id and pre_sequence_id != post_sequence_id
         )
 
-        # 3. Process NPC Turn only if entities exist
+        # 3. Process NPC Turn if entities exist.
+        # 이전에는 시퀀스 전이가 발생하면 NPC 턴을 스킵했는데,
+        # 그 결과 적/ NPC가 "아예 행동하지 않는" 심각한 상태가 발생했다.
+        # 전이가 발생한 경우에도, 전이 이후 시퀀스의 엔티티가 존재한다면
+        # 해당 시퀀스 기준으로 NPC/적 턴을 1회 실행한다.
         if entities and not should_end and not sequence_transitioned:
             logger.info(f"Active entities found: {entities}. Proceeding to NPC turn.")
             npc_response = await self.process_npc_turn(user_input.session_id)
             player_response["npc_turn"] = npc_response
-        elif entities and sequence_transitioned:
+        elif entities and not should_end and sequence_transitioned:
             logger.info(
                 (
                     "Sequence transitioned (%s -> %s). "
-                    "Skipping NPC turn for this player turn."
+                    "Running NPC turn on the transitioned sequence."
                 ),
                 pre_sequence_id,
                 post_sequence_id,
             )
-            player_response["npc_turn"] = None
+            npc_response = await self.process_npc_turn(user_input.session_id)
+            player_response["npc_turn"] = npc_response
         elif entities and should_end:
             logger.info("Session already ended. Skipping NPC turn.")
             player_response["npc_turn"] = None
@@ -505,10 +708,38 @@ class GameEngine:
             final_state.get("world_snapshot", {}) or {},
             active_entity_id,
         )
+        snapshot = final_state.get("world_snapshot", {}) or {}
+        actor_type = self._resolve_actor_type(snapshot, active_entity_id)
+        dialogue = final_state.get("npc_dialogue")
+
+        # Client-friendly ordering for NPC/enemy turns:
+        # show spoken line first, then narration of what happened.
+        outputs: list[dict[str, Any]] = []
+        if dialogue:
+            outputs.append(
+                {
+                    "kind": TurnOutputKind.DIALOGUE,
+                    "text": str(dialogue),
+                    "actor_type": actor_type,
+                    "actor_id": active_entity_id,
+                    "actor_name": active_entity_name,
+                }
+            )
+        outputs.append(
+            {
+                "kind": TurnOutputKind.NARRATION,
+                "text": final_state["narrative"],
+                "actor_type": ActorType.NARRATOR,
+                "actor_id": "narrator",
+                "actor_name": "narrator",
+            }
+        )
 
         return {
             "turn_id": final_state["turn_id"],
             "narrative": final_state["narrative"],
+            "dialogue": dialogue,
+            "outputs": outputs,
             "commit_id": final_state["commit_id"],
             "active_entity_id": active_entity_id,  # Return who acted
             "active_entity_name": active_entity_name,
@@ -607,59 +838,45 @@ class GameEngine:
 
     @log_node_execution
     async def select_active_entity(self, state: TurnContext) -> TurnContext:
-        """Decide active entity for the turn. Automatically falls back to 'narrator'."""
+        """
+        Decide active entity for the turn.
+        Critical behavior:
+        - In COMBAT, an enemy should act if any are alive (no LLM selection).
+        - Outside COMBAT, prefer NPCs if present.
+        - Fall back to narrator only when no non-player entities exist.
+        """
         if not state.get("is_npc_turn"):
             return {"active_entity_id": "player"}
 
-        history = await self._fetch_history(state["session_id"], limit=5)
-        snapshot = state.get("world_snapshot", {})
+        snapshot = state.get("world_snapshot", {}) or {}
+        seq_type = str(state.get("sequence_type") or "EXPLORATION").upper()
 
-        # Gather NPCs and Enemies
-        entities = snapshot.get("entities", [])
-        candidate_entities = [e for e in entities if str(e).lower() != "player"]
+        pools = self._build_actor_pool(snapshot)
+        npcs = pools["npcs"]
+        enemies = pools["enemies"]
 
-        # If no NPCs or enemies, narrator MUST act
-        if not candidate_entities:
-            logger.info(
-                "   -> No entities in sequence. Automatically selecting 'narrator'."
-            )
+        alive_enemy_ids = [e["scenario_id"] for e in enemies if e.get("alive")]
+        any_enemy_ids = [e["scenario_id"] for e in enemies]
+        npc_ids = [n["scenario_id"] for n in npcs]
+
+        # Prefer enemies in combat to ensure combat actually progresses.
+        if "COMBAT" in seq_type:
+            pool = alive_enemy_ids or any_enemy_ids or npc_ids
+        else:
+            pool = npc_ids or alive_enemy_ids or any_enemy_ids
+
+        if not pool:
+            logger.info("   -> No non-player entities. Selecting narrator.")
             return {"active_entity_id": "narrator"}
 
-        # If there are NPCs, let LLM decide between NPCs and Narrator
-        candidate_entities.append("narrator")
-        entity_list_str = ", ".join([str(e) for e in candidate_entities])
-
-        system_instruction = self._load_prompt("select_active_entity/system.txt")
-        user_prompt = self._load_prompt("select_active_entity/user.txt")
-
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_instruction),
-                ("user", user_prompt),
-            ]
+        seed = (
+            f"{state.get('session_id', '')}|"
+            f"{snapshot.get('current_turn', '')}|"
+            f"{snapshot.get('current_sequence_id', '')}|npc_turn"
         )
-
-        chain = prompt | self.llm
-
-        try:
-            response_msg = await chain.ainvoke(
-                {
-                    "entity_list": entity_list_str,
-                    "history": history,
-                    "sequence_type": state.get("sequence_type", "EXPLORATION"),
-                }
-            )
-            selected_entity = response_msg.content.strip().lower()
-
-            # Validation: ensure selected is in our candidate list
-            if selected_entity not in [str(e).lower() for e in candidate_entities]:
-                selected_entity = "narrator"
-
-            logger.info(f"   -> Selected Actor: {selected_entity}")
-            return {"active_entity_id": selected_entity}
-        except Exception as e:
-            logger.error(f"Actor selection failed: {e}. Defaulting to 'narrator'.")
-            return {"active_entity_id": "narrator"}
+        picked = self._pick_deterministic(seed, [str(x).lower() for x in pool])
+        logger.info("   -> Selected Actor (deterministic): %s", picked)
+        return {"active_entity_id": picked}
 
     @log_node_execution
     async def generate_npc_input(self, state: TurnContext) -> TurnContext:
@@ -668,8 +885,10 @@ class GameEngine:
             return {}
 
         history = await self._fetch_history(state["session_id"])
-        actor = state.get("active_entity_id", "narrator")
-        snapshot = state.get("world_snapshot", {})
+        actor_id = state.get("active_entity_id", "narrator")
+        snapshot = state.get("world_snapshot", {}) or {}
+        actor_name = self._resolve_active_entity_name(snapshot, actor_id)
+        actor_type = self._resolve_actor_type(snapshot, actor_id)
 
         # Additional context for Narrator
         sequence_info = snapshot.get(
@@ -678,7 +897,7 @@ class GameEngine:
         exit_triggers = sequence_info.get("exit_triggers", [])
         goal = sequence_info.get("goal", "상황에 몰입하기")
 
-        if actor.lower() == "narrator":
+        if str(actor_id).lower() == "narrator":
             system_instruction = self._load_prompt(
                 "generate_npc_input/narrator_system.txt"
             )
@@ -694,27 +913,115 @@ class GameEngine:
             ]
         )
 
-        chain = prompt | self.llm
+        # Narrator는 기존처럼 단일 텍스트를 생성한다.
+        if str(actor_id).lower() == "narrator":
+            chain = prompt | self.llm
+            try:
+                response_msg = await chain.ainvoke(
+                    {
+                        "history": history,
+                        "goal": goal,
+                        "exit_triggers": exit_triggers,
+                        "actor": actor_name,
+                        "sequence_type": state.get("sequence_type", "EXPLORATION"),
+                        "actor_type": actor_type.value,
+                    }
+                )
+                npc_action_text = response_msg.content
+                logger.info(
+                    "   -> Generated Narrator Guidance action_len=%s",
+                    len(npc_action_text),
+                )
+            except Exception as e:
+                logger.error(f"Failed to generate actor input: {e}")
+                npc_action_text = (
+                    "주변에 정적이 흐릅니다. 당신의 다음 결정을 기다리는 듯합니다."
+                )
+            return {"user_input": npc_action_text, "npc_dialogue": None}
 
+        # NPC/적은 JSON(action/dialogue)을 생성하게 하고, 우리가 직접 파싱한다.
         try:
+            chain = prompt | self.llm
             response_msg = await chain.ainvoke(
                 {
                     "history": history,
                     "goal": goal,
                     "exit_triggers": exit_triggers,
-                    "actor": actor,
+                    "actor": actor_name,
                     "sequence_type": state.get("sequence_type", "EXPLORATION"),
+                    "actor_type": actor_type.value,
                 }
             )
-            npc_action_text = response_msg.content
-            logger.info(f"   -> Generated Action for [{actor}]: {npc_action_text}")
-        except Exception as e:
-            logger.error(f"Failed to generate actor input: {e}")
-            npc_action_text = (
-                "주변에 정적이 흐릅니다. 당신의 다음 결정을 기다리는 듯합니다."
-            )
+            raw = response_msg.content
+            data = self._extract_first_json_object(raw)
+            if not data:
+                raise ValueError("Invalid JSON output")
 
-        return {"user_input": npc_action_text}
+            npc_action_text = str(data.get("action") or "").strip()
+            npc_dialogue_raw = data.get("dialogue")
+            npc_dialogue = (
+                str(npc_dialogue_raw).strip()
+                if npc_dialogue_raw is not None and str(npc_dialogue_raw).strip()
+                else None
+            )
+            if not npc_action_text:
+                raise ValueError("Empty npc action")
+            if not npc_dialogue:
+                npc_dialogue = "..."
+            logger.info(
+                (
+                    "   -> Generated NPC structured input "
+                    "actor=%s action_len=%s dialogue=%s"
+                ),
+                actor_id,
+                len(npc_action_text),
+                "yes" if npc_dialogue else "no",
+            )
+            return {"user_input": npc_action_text, "npc_dialogue": npc_dialogue}
+        except Exception as e:
+            # Fallback: if structured output fails, keep backward-compatible behavior.
+            logger.warning(
+                "Failed to generate json npc input (fallback to plain text). "
+                "actor=%s error=%s",
+                actor_id,
+                type(e).__name__,
+            )
+            chain = prompt | self.llm
+            try:
+                response_msg = await chain.ainvoke(
+                    {
+                        "history": history,
+                        "goal": goal,
+                        "exit_triggers": exit_triggers,
+                        "actor": actor_name,
+                        "sequence_type": state.get("sequence_type", "EXPLORATION"),
+                        "actor_type": actor_type.value,
+                    }
+                )
+                npc_action_text = response_msg.content
+                extracted = self._extract_first_quoted_dialogue(npc_action_text)
+                npc_dialogue = extracted or "..."
+                # Remove the extracted dialogue from action text if present.
+                if extracted:
+                    npc_action_text = re.sub(
+                        r"\"%s\"" % re.escape(extracted),
+                        "",
+                        npc_action_text,
+                    ).strip()
+                if not npc_action_text:
+                    npc_action_text = "상대의 움직임을 관찰하고 다음 행동을 준비한다."
+                logger.info(
+                    "   -> Generated NPC fallback action actor=%s len=%s",
+                    actor_id,
+                    len(npc_action_text),
+                )
+            except Exception as inner:
+                logger.error(f"Failed to generate actor input: {inner}")
+                npc_action_text = (
+                    "주변에 정적이 흐릅니다. 당신의 다음 결정을 기다리는 듯합니다."
+                )
+                npc_dialogue = None
+            return {"user_input": npc_action_text, "npc_dialogue": npc_dialogue}
 
     @log_node_execution
     async def init_turn(self, state: TurnContext) -> TurnContext:
@@ -755,9 +1062,21 @@ class GameEngine:
                 )
             }
 
-        selected_target_id, selected_target_name, target_mode = (
-            self._select_turn_target(state)
-        )
+        snapshot = state.get("world_snapshot", {}) or {}
+        seq_type = str(state.get("sequence_type") or "").upper()
+        actor_type = self._resolve_actor_type(snapshot, active_entity)
+
+        # Target selection must respect actor type:
+        # - PLAYER/NPC usually target enemies
+        # - ENEMY defaults to player (otherwise enemies "act" but never hit anything)
+        if "COMBAT" in seq_type and actor_type == ActorType.ENEMY:
+            selected_target_id, selected_target_name, target_mode = (
+                self._select_enemy_default_target(snapshot)
+            )
+        else:
+            selected_target_id, selected_target_name, target_mode = (
+                self._select_turn_target(state)
+            )
         if selected_target_id:
             if target_mode == "random":
                 logger.info(
@@ -1001,6 +1320,12 @@ class GameEngine:
 
         active_entity = state.get("active_entity_id", "player")
         is_narrator = active_entity.lower() == "narrator"
+        actor_type = self._resolve_actor_type(
+            state.get("world_snapshot", {}) or {}, active_entity
+        )
+        actor_name = self._resolve_active_entity_name(
+            state.get("world_snapshot", {}) or {}, active_entity
+        )
 
         if is_narrator:
             system_instruction = self._load_prompt(
@@ -1084,6 +1409,13 @@ class GameEngine:
                 f"이번 턴은 입력에 명시 대상이 없어 시스템이 임의로 대상을 선택했다. "
                 f"행동 결과가 {selected_target_name}에게 적용된 것으로 서술하라.\n"
             )
+        if state.get("is_npc_turn") and actor_type in (ActorType.NPC, ActorType.ENEMY):
+            required_narrative_instruction += (
+                "\n[행동 주체 고정]\n"
+                f"이번 턴의 행동 주체는 '{actor_name}'이다. "
+                "2인칭(당신)을 절대 사용하지 말고, 주어는 반드시 행동 주체로 서술하라. "
+                "첫 문장은 가능하면 '{actor_name}는/은'으로 시작하라.\n"
+            )
 
         for attempt_idx in range(max_retries):
             try:
@@ -1144,6 +1476,24 @@ class GameEngine:
                 logger.exception("Error during narrative generation ainvoke")
                 raise e
             narrative = response_msg.content
+
+            # NPC/ENEMY 턴인데 2인칭이 섞이면 재시도한다.
+            if (
+                state.get("is_npc_turn")
+                and actor_type in (ActorType.NPC, ActorType.ENEMY)
+                and re.search(r"\\b당신", narrative)
+            ):
+                logger.warning(
+                    "NPC narrative used 2nd-person pronoun. Retrying... attempt=%s/%s",
+                    attempt_idx + 1,
+                    max_retries,
+                )
+                if attempt_idx < max_retries - 1:
+                    continue
+                # Last resort: simple rewrite to avoid '당신' as the subject.
+                narrative = narrative.replace("당신은", f"{actor_name}은").replace(
+                    "당신", actor_name
+                )
 
             if has_live_enemies and self._contains_terminal_claim(narrative):
                 logger.warning(

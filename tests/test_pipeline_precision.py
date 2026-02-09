@@ -648,7 +648,10 @@ async def test_npc_turn_workflow(mock_external_services, mock_db_handler):
     llm_chat_route.side_effect = [
         Response(200, json=create_chat_completion_response("npc_1")),  # Select Actor
         Response(
-            200, json=create_chat_completion_response("The NPC attacks!")
+            200,
+            json=create_chat_completion_response(
+                '{"action":"The NPC attacks!","dialogue":"For the queen!"}'
+            ),
         ),  # Generate NPC Action (via chat completion now)
         Response(
             200,
@@ -677,5 +680,6 @@ async def test_npc_turn_workflow(mock_external_services, mock_db_handler):
     # Verify
     assert final_state["active_entity_id"] == "npc_1"
     assert final_state["user_input"] == "The NPC attacks!"
+    assert final_state.get("npc_dialogue") == "For the queen!"
     assert final_state["narrative"] == "Narrative: The NPC attacks aggressively!"
     assert llm_chat_route.call_count == 3
