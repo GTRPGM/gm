@@ -24,6 +24,9 @@ class TurnContext(TypedDict, total=False):
     sequence_seq: Optional[int]  # N-th sequence in Act
 
     active_entity_id: str  # 'player' or NPC ID
+    selected_target_entity_id: Optional[str]
+    selected_target_name: Optional[str]
+    target_selection_mode: Optional[str]  # 'explicit' | 'random' | 'none'
 
     # --- Processing Data ---
     turn_seq: Optional[int]

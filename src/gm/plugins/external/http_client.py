@@ -72,6 +72,72 @@ class RuleManagerHTTPClient(RuleManagerPort):
         "우호적": "우호적",
     }
 
+    @staticmethod
+    def _normalize_match_text(value: str) -> str:
+        return re.sub(r"[^0-9a-z가-힣]+", "", str(value).lower())
+
+    @classmethod
+    def _infer_target_entity_id(
+        cls, user_input: str, req_entities: list[RuleRequestEntity], actor_id: str
+    ) -> str:
+        text_raw = str(user_input or "").strip()
+        if not text_raw:
+            return ""
+
+        text_lower = text_raw.lower()
+        text_norm = cls._normalize_match_text(text_raw)
+        if not text_norm:
+            return ""
+
+        type_weight = {
+            "enemy": 300,
+            "npc": 200,
+            "item": 150,
+            "object": 100,
+            "player": 10,
+        }
+
+        best_state_id = ""
+        best_score = 0
+        for entity in req_entities:
+            state_id = str(entity.state_entity_id or "").strip()
+            if not state_id:
+                continue
+            if actor_id and state_id == str(actor_id):
+                continue
+
+            aliases = {state_id, str(entity.entity_name or "").strip()}
+            aliases = {a for a in aliases if a}
+            if not aliases:
+                continue
+
+            candidate_score = 0
+            for alias in aliases:
+                alias_lower = alias.lower()
+                alias_norm = cls._normalize_match_text(alias)
+                if not alias_norm:
+                    continue
+
+                score = 0
+                if text_lower == alias_lower or text_norm == alias_norm:
+                    score = max(score, 120 + len(alias_norm))
+                if alias_lower in text_lower:
+                    score = max(score, 90 + len(alias_lower))
+                if alias_norm in text_norm:
+                    score = max(score, 80 + len(alias_norm))
+
+                candidate_score = max(candidate_score, score)
+
+            if candidate_score <= 0:
+                continue
+
+            total_score = candidate_score + type_weight.get(entity.entity_type, 0)
+            if total_score > best_score:
+                best_score = total_score
+                best_state_id = state_id
+
+        return best_state_id
+
     @retry_policy
     async def get_proposal(self, context: Dict[str, Any]) -> RuleOutcome:
         url = f"{settings.RULE_ENGINE_URL}/play/scenario"
@@ -124,7 +190,9 @@ class RuleManagerHTTPClient(RuleManagerPort):
             )
             s_id = str(npc.get("id") or npc.get("npc_id") or "")
             rule_id_val = parse_positive_int(npc.get("rule_id"))
-            entity_id = rule_id_val if rule_id_val is not None else parse_entity_id(m_id)
+            entity_id = (
+                rule_id_val if rule_id_val is not None else parse_entity_id(m_id)
+            )
             if not s_id:
                 continue
             req_entities.append(
@@ -147,7 +215,9 @@ class RuleManagerHTTPClient(RuleManagerPort):
             )
             s_id = str(enemy.get("id") or enemy.get("enemy_id") or "")
             rule_id_val = parse_positive_int(enemy.get("rule_id"))
-            entity_id = rule_id_val if rule_id_val is not None else parse_entity_id(m_id)
+            entity_id = (
+                rule_id_val if rule_id_val is not None else parse_entity_id(m_id)
+            )
             if not s_id:
                 continue
             req_entities.append(
@@ -178,6 +248,13 @@ class RuleManagerHTTPClient(RuleManagerPort):
                 )
             )
 
+        selected_target_id = str(context.get("selected_target_entity_id") or "").strip()
+        inferred_target_id = self._infer_target_entity_id(
+            str(user_input),
+            req_entities,
+            str(actual_active_id or ""),
+        )
+
         req_relations = []
         valid_entity_ids = {e.state_entity_id for e in req_entities}
 
@@ -189,7 +266,10 @@ class RuleManagerHTTPClient(RuleManagerPort):
             to_m_id = rel.get("to_id")
             from_s_id = master_to_instance.get(from_m_id, from_m_id)
             to_s_id = master_to_instance.get(to_m_id, to_m_id)
-            if str(from_s_id) not in valid_entity_ids or str(to_s_id) not in valid_entity_ids:
+            if (
+                str(from_s_id) not in valid_entity_ids
+                or str(to_s_id) not in valid_entity_ids
+            ):
                 # Rule engine currently handles Player/NPC/Enemy relations only.
                 # Skip edges that point to item-level scenario IDs.
                 continue
@@ -231,6 +311,7 @@ class RuleManagerHTTPClient(RuleManagerPort):
             "locale_id": locale_id,
             "sequence_type": sequence_type,
             "actor_id": str(actual_active_id or active_entity_id or ""),
+            "target": selected_target_id or inferred_target_id,
             "entities": [e.model_dump() for e in req_entities],
             "relations": req_relations,
             "story": user_input,

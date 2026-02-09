@@ -1,4 +1,5 @@
 import functools
+import hashlib
 import json
 import logging
 import os
@@ -247,6 +248,97 @@ class GameEngine:
         return out
 
     @staticmethod
+    def _normalize_match_text(value: str) -> str:
+        return re.sub(r"[^0-9a-z가-힣]+", "", str(value).lower())
+
+    @classmethod
+    def _select_turn_target(cls, state: TurnContext) -> tuple[str, str, str]:
+        """
+        Decide target for the current turn.
+        Returns: (target_entity_id, target_name, mode)
+        mode: explicit | random | none
+        """
+        sequence_type = str(state.get("sequence_type") or "").upper()
+        if "COMBAT" not in sequence_type:
+            return "", "", "none"
+
+        snapshot = state.get("world_snapshot", {}) or {}
+        enemies = [e for e in (snapshot.get("enemies") or []) if isinstance(e, dict)]
+        if not enemies:
+            return "", "", "none"
+
+        actor_id = str(state.get("active_entity_id") or "")
+        user_input = str(state.get("user_input") or "").strip()
+        text_lower = user_input.lower()
+        text_norm = cls._normalize_match_text(user_input)
+
+        candidates: list[dict[str, str]] = []
+        alive_candidates: list[dict[str, str]] = []
+
+        for enemy in enemies:
+            state_id = str(enemy.get("id") or enemy.get("enemy_id") or "").strip()
+            scenario_id = str(
+                enemy.get("scenario_entity_id") or enemy.get("scenario_enemy_id") or ""
+            ).strip()
+            name = str(enemy.get("name") or "").strip()
+            target_id = state_id or scenario_id
+            if not target_id or (actor_id and actor_id == target_id):
+                continue
+
+            aliases = [x for x in [target_id, scenario_id, name] if x]
+            rec = {"id": target_id, "name": name, "aliases": aliases}
+            candidates.append(rec)
+
+            is_defeated = bool(enemy.get("is_defeated"))
+            hp = enemy.get("current_hp")
+            if hp is None:
+                hp = ((enemy.get("state") or {}).get("numeric") or {}).get("HP")
+            is_alive = not is_defeated
+            if hp is not None:
+                try:
+                    is_alive = is_alive and int(hp) > 0
+                except (TypeError, ValueError):
+                    pass
+            if is_alive:
+                alive_candidates.append(rec)
+
+        if not candidates:
+            return "", "", "none"
+
+        best: dict[str, str] | None = None
+        best_score = 0
+        for rec in candidates:
+            rec_score = 0
+            for alias in rec["aliases"]:
+                alias_l = alias.lower()
+                alias_n = cls._normalize_match_text(alias)
+                if not alias_n:
+                    continue
+                score = 0
+                if text_lower == alias_l or text_norm == alias_n:
+                    score = max(score, 120 + len(alias_n))
+                if alias_l and alias_l in text_lower:
+                    score = max(score, 90 + len(alias_l))
+                if alias_n and alias_n in text_norm:
+                    score = max(score, 80 + len(alias_n))
+                rec_score = max(rec_score, score)
+            if rec_score > best_score:
+                best = rec
+                best_score = rec_score
+
+        if best and best_score > 0:
+            return best["id"], best["name"], "explicit"
+
+        pool = alive_candidates if alive_candidates else candidates
+        seed_src = (
+            f"{state.get('session_id', '')}|{state.get('turn_id', '')}|{user_input}"
+        )
+        seed_hex = hashlib.sha256(seed_src.encode("utf-8")).hexdigest()
+        idx = int(seed_hex[:8], 16) % len(pool)
+        picked = pool[idx]
+        return picked["id"], picked["name"], "random"
+
+    @staticmethod
     def _resolve_sequence_type(snapshot: Dict[str, Any], fallback: str | None) -> str:
         metadata = snapshot.get("metadata") or {}
         hint = ""
@@ -372,7 +464,10 @@ class GameEngine:
             player_response["npc_turn"] = npc_response
         elif entities and sequence_transitioned:
             logger.info(
-                "Sequence transitioned (%s -> %s). Skipping NPC turn for this player turn.",
+                (
+                    "Sequence transitioned (%s -> %s). "
+                    "Skipping NPC turn for this player turn."
+                ),
                 pre_sequence_id,
                 post_sequence_id,
             )
@@ -633,7 +728,13 @@ class GameEngine:
 
         turn_id = f"{state['session_id']}:{seq}"
         logger.info(f"   -> New Turn ID: {turn_id}")
-        return {"turn_seq": seq, "turn_id": turn_id}
+        return {
+            "turn_seq": seq,
+            "turn_id": turn_id,
+            "selected_target_entity_id": "",
+            "selected_target_name": "",
+            "target_selection_mode": "none",
+        }
 
     @log_node_execution
     async def check_rule(self, state: TurnContext) -> TurnContext:
@@ -654,8 +755,28 @@ class GameEngine:
                 )
             }
 
+        selected_target_id, selected_target_name, target_mode = (
+            self._select_turn_target(state)
+        )
+        if selected_target_id:
+            if target_mode == "random":
+                logger.info(
+                    "   -> Target not specified. Randomly selected target: %s (%s)",
+                    selected_target_id,
+                    selected_target_name or "unknown",
+                )
+            else:
+                logger.info(
+                    "   -> Explicit target inferred: %s (%s)",
+                    selected_target_id,
+                    selected_target_name or "unknown",
+                )
+
         try:
-            proposal = await self.rule_client.get_proposal(state)
+            proposal_context = dict(state)
+            if selected_target_id:
+                proposal_context["selected_target_entity_id"] = selected_target_id
+            proposal = await self.rule_client.get_proposal(proposal_context)
         except Exception as e:
             logger.warning(
                 "rule_engine_unavailable_fallback error=%s", type(e).__name__
@@ -667,7 +788,12 @@ class GameEngine:
                 reason="룰 엔진 오류로 기본 판정을 적용합니다.",
                 suggested={"diffs": [], "relations": []},
             )
-        return {"rule_outcome": proposal}
+        return {
+            "rule_outcome": proposal,
+            "selected_target_entity_id": selected_target_id,
+            "selected_target_name": selected_target_name,
+            "target_selection_mode": target_mode,
+        }
 
     @log_node_execution
     async def check_scenario(self, state: TurnContext) -> TurnContext:
@@ -792,10 +918,9 @@ class GameEngine:
                 if isinstance(latest_sequence, dict):
                     if latest_sequence.get("enemies") is not None:
                         latest_snapshot["enemies"] = latest_sequence.get("enemies")
-                    if (
-                        not latest_snapshot.get("current_sequence_id")
-                        and latest_sequence.get("sequence_id")
-                    ):
+                    if not latest_snapshot.get(
+                        "current_sequence_id"
+                    ) and latest_sequence.get("sequence_id"):
                         latest_snapshot["current_sequence_id"] = latest_sequence.get(
                             "sequence_id"
                         )
@@ -835,10 +960,9 @@ class GameEngine:
                 if isinstance(latest_sequence, dict):
                     if latest_sequence.get("enemies") is not None:
                         latest_snapshot["enemies"] = latest_sequence.get("enemies")
-                    if (
-                        not latest_snapshot.get("current_sequence_id")
-                        and latest_sequence.get("sequence_id")
-                    ):
+                    if not latest_snapshot.get(
+                        "current_sequence_id"
+                    ) and latest_sequence.get("sequence_id"):
                         latest_snapshot["current_sequence_id"] = latest_sequence.get(
                             "sequence_id"
                         )
@@ -911,14 +1035,12 @@ class GameEngine:
                     snapshot["npcs"] = latest_sequence.get("npcs")
                 if latest_sequence.get("items") is not None:
                     snapshot["items"] = latest_sequence.get("items")
-                if (
-                    not snapshot.get("current_sequence_id")
-                    and latest_sequence.get("sequence_id")
+                if not snapshot.get("current_sequence_id") and latest_sequence.get(
+                    "sequence_id"
                 ):
                     snapshot["current_sequence_id"] = latest_sequence.get("sequence_id")
-                if (
-                    not snapshot.get("sequence_name")
-                    and latest_sequence.get("sequence_name")
+                if not snapshot.get("sequence_name") and latest_sequence.get(
+                    "sequence_name"
                 ):
                     snapshot["sequence_name"] = latest_sequence.get("sequence_name")
                 if latest_sequence.get("location_name"):
@@ -933,6 +1055,10 @@ class GameEngine:
 
         has_live_enemies = self._has_live_enemies_in_current_sequence(snapshot)
         session_ended = str(snapshot.get("status", "")).lower() == "ended"
+        selected_target_name = str(state.get("selected_target_name") or "").strip()
+        target_selection_mode = str(
+            state.get("target_selection_mode") or "none"
+        ).lower()
 
         # Fetch history for context
         history = await self._fetch_history(state["session_id"], limit=5)
@@ -942,13 +1068,21 @@ class GameEngine:
         if has_live_enemies:
             forbidden_narrative_instruction = (
                 "\n[금지 표현]\n"
-                "현재 시퀀스에 생존 적이 남아 있다. 아래와 같은 종료/완료 선언은 절대 쓰지 마라:\n"
+                "현재 시퀀스에 생존 적이 남아 있다. "
+                "아래와 같은 종료/완료 선언은 절대 쓰지 마라:\n"
                 "- 모험은 끝이 났다.\n"
                 "- 작전이 성공적으로 마무리되었다.\n"
                 "- 모든 적이 쓰러졌다.\n"
                 "- 봉인이 완전히 안정화되었다.\n"
                 "- 마지막 남은 적/핵심 적을 처치했다는 단정.\n"
                 "- 승리를 확신하거나 전투 종료를 기정사실화하는 표현.\n"
+            )
+        required_narrative_instruction = ""
+        if target_selection_mode == "random" and selected_target_name:
+            required_narrative_instruction = (
+                "\n[타겟 선택 메모]\n"
+                f"이번 턴은 입력에 명시 대상이 없어 시스템이 임의로 대상을 선택했다. "
+                f"행동 결과가 {selected_target_name}에게 적용된 것으로 서술하라.\n"
             )
 
         for attempt_idx in range(max_retries):
@@ -999,7 +1133,7 @@ class GameEngine:
                 context = {
                     "input_text": state["user_input"],
                     "outcome": rule_outcome.model_dump(),
-                    "required_narrative_instruction": "",
+                    "required_narrative_instruction": required_narrative_instruction,
                     "forbidden_narrative_instruction": forbidden_narrative_instruction,
                     "history": history,
                     "active_entity_id": active_entity,
@@ -1020,10 +1154,13 @@ class GameEngine:
                 )
                 if attempt_idx < max_retries - 1:
                     continue
-                live_enemy_count = self._count_live_enemies_in_current_sequence(snapshot)
+                live_enemy_count = self._count_live_enemies_in_current_sequence(
+                    snapshot
+                )
                 narrative = (
                     "교전이 계속되고 있다. "
-                    f"현재 시퀀스에는 아직 쓰러지지 않은 적이 {live_enemy_count}명 남아 있다. "
+                    "현재 시퀀스에는 아직 쓰러지지 않은 적이 "
+                    f"{live_enemy_count}명 남아 있다. "
                     "전투는 아직 끝나지 않았고 적의 위협이 남아 있다."
                 )
                 break
@@ -1032,7 +1169,11 @@ class GameEngine:
 
         # Do not let LLM decide termination phrasing from transition hints.
         # Append terminal line only from committed state.
-        if session_ended and not has_live_enemies and "모험은 끝이 났다." not in narrative:
+        if (
+            session_ended
+            and not has_live_enemies
+            and "모험은 끝이 났다." not in narrative
+        ):
             narrative = f"{narrative.strip()}\n\n모험은 끝이 났다."
 
         return {"narrative": narrative}

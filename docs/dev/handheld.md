@@ -12,21 +12,25 @@
 
 ### How to run
 - 로컬 실행: `bin/project run` (localhost:8020)
-- Docker Compose 실행: `bin/compose-start` 또는 `bin/project run-compose`
+- 루트 Compose 실행: `bin/project up gm`
+- 루트 Compose 포트: `http://localhost:18020`
 
 ### How to test (unit)
 - `uv run pytest tests`
 
 ### How to run e2e
-- `bin/compose-start` 실행 후 통합 테스트 스크립트 활용 (e.g., `scripts/verify_gm_flow.py`)
+- 루트 compose 실행 후 통합 테스트 스크립트 활용 (e.g., `scripts/verify_gm_flow.py`)
 
 ### Conventions / gotchas
 - **프롬프트 관리**: `src/gm/core/engine/prompts/`에서 상황별 텍스트 파일로 관리
 - **DB 안정성**: 시작 시 자동 재시도 및 `/system/reconnect` 엔드포인트를 통한 수동 재연결 지원
 - **도구**: `uv` 패키지 매니저, `ruff` 린터/포맷터 (`bin/project lint`)
 - **설정**: 기본 포트 8020, API 버전 `/api/v1`
+- **로컬 compose DB 매핑**: `gm_db` / `gm_user`
+- **원격 검증 타깃**: 통합 테스터는 `BE_ROUTER_BASE_URL` 또는 `--target remote`를 통해 리모트 라우터 경로를 반드시 재현해야 함
 <!-- PROJ_UNDERSTANDING_END -->
 
 <!-- PROJ_WORKNOTES_BEGIN -->
 ## Work Notes by Detail
+- plan_0001: GM 테스터를 `local/remote` 2개 타깃으로 확장하고, 서사/상태 불일치를 `NarrativeMismatch`, `StateMismatch`, `RouterContractMismatch`로 분류하는 검증 루프를 도입 예정.
 <!-- PROJ_WORKNOTES_END -->

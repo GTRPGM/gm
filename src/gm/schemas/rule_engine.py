@@ -25,6 +25,7 @@ class RuleCheckRequest(BaseModel):
     locale_id: int = 0
     sequence_type: str = "EXPLORATION"
     actor_id: str = "player"
+    target: str = ""
     entities: List[RuleRequestEntity]
     relations: List[RuleRequestRelation]
     story: str

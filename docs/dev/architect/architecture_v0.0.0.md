@@ -29,4 +29,6 @@
 - Impact: 유연한 게임 시나리오 확장 가능
 
 ## Compatibility / migration notes
-- 초기 버전으로 현재 마이그레이션 이슈 없음
+- 통합 테스터는 로컬 직접 호출과 리모트 BE-router 경유 호출을 모두 지원해야 하며, 두 경로의 응답 계약 차이를 회귀 기준으로 관리한다.
+- 서사 출력과 상태 반영 간 불일치(`NarrativeMismatch`, `StateMismatch`)를 분리 기록하도록 검증 체계를 확장한다.
+- 루트 `docker-compose.local.yml` 기준 실행 시 GM은 `18020` 포트를 사용하고 DB는 `gm_db`/`gm_user`를 사용한다.

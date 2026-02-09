@@ -87,7 +87,10 @@ async def test_rule_manager_complex_payload(respx_mock):
         r["cause_entity_id"] == "p1" and r["effect_entity_id"] == "npc_456"
         for r in payload["relations"]
     )
-    assert not any("item-iron-sword-1" in (r["cause_entity_id"], r["effect_entity_id"]) for r in payload["relations"])
+    assert not any(
+        "item-iron-sword-1" in (r["cause_entity_id"], r["effect_entity_id"])
+        for r in payload["relations"]
+    )
 
 
 @pytest.mark.asyncio
@@ -128,6 +131,53 @@ async def test_rule_manager_maps_player_actor_id_to_state_entity_id(respx_mock):
 
     payload = json.loads(request.content)
     assert payload["actor_id"] == "player-state-uuid-1"
+
+
+@pytest.mark.asyncio
+async def test_rule_manager_infers_target_from_user_input(respx_mock):
+    client = RuleManagerHTTPClient()
+    respx_mock.post("http://rule-engine:8050/play/scenario").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "status": "success",
+                "data": {
+                    "session_id": "123",
+                    "scenario_id": "1",
+                    "success": True,
+                    "reason": "ok",
+                    "suggested": {"diffs": [], "relations": []},
+                },
+            },
+        )
+    )
+
+    await client.get_proposal(
+        {
+            "session_id": "123",
+            "user_input": "용에게 화염탄을 던진다.",
+            "active_entity_id": "player",
+            "world_snapshot": {
+                "player_id": "player-state-uuid-1",
+                "player_name": "Hero",
+                "npcs": [],
+                "enemies": [
+                    {
+                        "id": "enemy_1",
+                        "name": "고블린",
+                        "scenario_entity_id": "goblin-1",
+                    },
+                    {"id": "enemy_2", "name": "용", "scenario_entity_id": "dragon-1"},
+                ],
+            },
+        }
+    )
+
+    request = respx_mock.calls.last.request
+    import json
+
+    payload = json.loads(request.content)
+    assert payload["target"] == "enemy_2"
 
 
 @pytest.mark.asyncio

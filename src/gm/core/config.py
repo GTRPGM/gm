@@ -1,4 +1,4 @@
-from pydantic import Field, computed_field
+from pydantic import AliasChoices, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,7 +15,10 @@ class Settings(BaseSettings):
 
     DB_USER: str = Field("postgres", validation_alias="DB_USER")
     DB_PASSWORD: str = Field("postgres", validation_alias="DB_PASSWORD")
-    DB_HOST: str = Field("localhost", validation_alias="DB_SERVER")
+    # Accept both DB_SERVER (legacy) and DB_HOST (common) env names.
+    DB_HOST: str = Field(
+        "localhost", validation_alias=AliasChoices("DB_SERVER", "DB_HOST")
+    )
     DB_PORT: int = Field(5432, validation_alias="DB_PORT")
     DB_NAME: str = Field("gtrpgm", validation_alias="DB_DB")
 

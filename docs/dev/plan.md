@@ -13,8 +13,10 @@
 | F03 | Game Engine | Basic Game Engine logic with LangGraph | doing |
 | F04 | Game Endpoints | Play, Session management APIs | doing |
 | F05 | System Endpoints | Health and System status APIs | done |
+| plan_0001 | GM Tester: Narrative/State Consistency + Remote BE-router | docs/dev/detail/plan_0001.md | doing |
 <!-- PROJ_DASHBOARD_END -->
 
 <!-- PROJ_TODO_BEGIN -->
 ## TODO (Undone detail plans)
+- [ ] docs/dev/detail/plan_0001.md
 <!-- PROJ_TODO_END -->
