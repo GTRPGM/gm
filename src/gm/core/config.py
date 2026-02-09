@@ -65,51 +65,40 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True)
 
     @staticmethod
-    def _apply_url_override(
-        data: dict,
-        url_key: str,
-        host_key: str,
-        port_key: str,
-    ) -> None:
-        raw = data.get(url_key)
-        if not raw:
-            return
+    def _parse_url_host_port(raw: str) -> tuple[str | None, int | None]:
         try:
             parsed = urlparse(str(raw))
         except Exception:
-            return
-        if parsed.hostname:
-            data[host_key] = parsed.hostname
-        if parsed.port:
-            data[port_key] = int(parsed.port)
+            return None, None
+        host = parsed.hostname
+        port = parsed.port
+        return host, int(port) if port is not None else None
 
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_service_endpoints(cls, data):
-        # BaseSettings passes a dict-like; normalize to a mutable dict.
-        d = dict(data or {})
-
-        cls._apply_url_override(
-            d, "BE_ROUTER_URL_IN", "BE_ROUTER_HOST", "BE_ROUTER_PORT"
-        )
-        cls._apply_url_override(
-            d, "STATE_MANAGER_URL_IN", "STATE_MANAGER_HOST", "STATE_MANAGER_PORT"
-        )
-        cls._apply_url_override(
-            d,
-            "SCENARIO_SERVICE_URL_IN",
-            "SCENARIO_SERVICE_HOST",
-            "SCENARIO_SERVICE_PORT",
-        )
-        cls._apply_url_override(
-            d, "RULE_ENGINE_URL_IN", "RULE_ENGINE_HOST", "RULE_ENGINE_PORT"
-        )
-        cls._apply_url_override(
-            d, "LLM_GATEWAY_URL_IN", "LLM_GATEWAY_HOST", "LLM_GATEWAY_PORT"
-        )
-        cls._apply_url_override(d, "WEB_URL_IN", "WEB_HOST", "WEB_PORT")
-
-        return d
+    @model_validator(mode="after")
+    def _apply_service_url_overrides(self):
+        # After validation, *_URL_IN fields are populated from env aliases.
+        mapping = [
+            ("BE_ROUTER_URL_IN", "BE_ROUTER_HOST", "BE_ROUTER_PORT"),
+            ("STATE_MANAGER_URL_IN", "STATE_MANAGER_HOST", "STATE_MANAGER_PORT"),
+            (
+                "SCENARIO_SERVICE_URL_IN",
+                "SCENARIO_SERVICE_HOST",
+                "SCENARIO_SERVICE_PORT",
+            ),
+            ("RULE_ENGINE_URL_IN", "RULE_ENGINE_HOST", "RULE_ENGINE_PORT"),
+            ("LLM_GATEWAY_URL_IN", "LLM_GATEWAY_HOST", "LLM_GATEWAY_PORT"),
+            ("WEB_URL_IN", "WEB_HOST", "WEB_PORT"),
+        ]
+        for url_attr, host_attr, port_attr in mapping:
+            raw = getattr(self, url_attr, None)
+            if not raw:
+                continue
+            host, port = self._parse_url_host_port(str(raw))
+            if host:
+                setattr(self, host_attr, host)
+            if port:
+                setattr(self, port_attr, port)
+        return self
 
     @computed_field
     @property
