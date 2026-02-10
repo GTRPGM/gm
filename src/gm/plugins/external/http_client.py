@@ -72,6 +72,27 @@ class RuleManagerHTTPClient(RuleManagerPort):
         "우호적": "우호적",
     }
 
+    @classmethod
+    def _normalize_relation_key(cls, raw_value: str | None) -> str:
+        if not raw_value:
+            return "NEUTRAL"
+        text = str(raw_value).strip()
+        if not text:
+            return "NEUTRAL"
+        if text.lower().startswith("relationtype."):
+            text = text.split(".", 1)[1]
+        candidate = text.upper().replace(" ", "_")
+        if candidate in cls.RELATION_MAP:
+            return candidate
+        normalized_input = text.lower().strip()
+        for key, value in cls.RELATION_MAP.items():
+            if value.lower() == normalized_input:
+                return key
+        alnum_candidate = "".join(ch for ch in text if ch.isalnum()).upper()
+        if alnum_candidate in cls.RELATION_MAP:
+            return alnum_candidate
+        return "NEUTRAL"
+
     @staticmethod
     def _normalize_match_text(value: str) -> str:
         return re.sub(r"[^0-9a-z가-힣]+", "", str(value).lower())
@@ -273,7 +294,7 @@ class RuleManagerHTTPClient(RuleManagerPort):
         valid_entity_ids = {e.state_entity_id for e in req_entities}
 
         for rel in relations_source:
-            r_type = rel.get("relation_type", "NEUTRAL")
+            r_type = self._normalize_relation_key(rel.get("relation_type"))
             mapped_type = self.RELATION_MAP.get(r_type, "중립적")
 
             from_m_id = rel.get("from_id")
@@ -304,7 +325,7 @@ class RuleManagerHTTPClient(RuleManagerPort):
 
         for rel in player_rels:
             if player_id:
-                r_type = rel.get("relation_type", "NEUTRAL")
+                r_type = self._normalize_relation_key(rel.get("relation_type"))
                 mapped_type = self.RELATION_MAP.get(r_type, "중립적")
                 npc_s_id = str(rel.get("npc_id") or rel.get("id") or "")
                 if not npc_s_id:

@@ -66,40 +66,47 @@ def override_dependencies(mock_db_handler):
 def mock_external_services(respx_mock):
     """
     외부 서비스 호출을 가로챕니다.
+    실제 Pydantic 스키마를 완벽히 준수하도록 Mock 응답을 구성합니다.
     """
-    # Rule Manager
+    # Rule Manager: RuleOutcomeData 스키마 준수
     respx_mock.post(f"{settings.RULE_ENGINE_URL}/play/scenario").mock(
         return_value=Response(
             200,
             json={
                 "status": "success",
                 "data": {
-                    "session_id": "1",
-                    "scenario_id": "1",
-                    "phase_type": "탐험",
-                    "reason": "Mock Rule Check",
+                    "session_id": "test_session",
+                    "scenario_id": "scen-1",
+                    "phase_type": "EXPLORATION",
+                    "reason": "Mock Rule Check Success",
                     "success": True,
                     "suggested": {
                         "diffs": [{"state_entity_id": "dummy", "diff": {"hp": 90}}],
                         "relations": [],
                     },
                     "value_range": None,
+                    "logs": [],
                 },
                 "message": "OK",
             },
         )
     )
 
-    # Scenario Manager
+    # Scenario Manager: ScenarioSuggestion 스키마 준수
     respx_mock.post(f"{settings.SCENARIO_SERVICE_URL}/api/v1/check/validate").mock(
         return_value=Response(
             200,
             json={
-                "is_triggered": False,
-                "reason": "Mock Scenario Check via Validate API",
-                "next_act_id": None,
-                "next_seq_id": None,
-                "suggested_narration": None,
+                "status": "success",
+                "data": {
+                    "constraint_type": "advisory",
+                    "description": "Mock scenario check",
+                    "correction_diffs": [],
+                    "next_act_id": None,
+                    "next_seq_id": None,
+                    "should_end": False,
+                    "narrative_slot": None,
+                },
             },
         )
     )
@@ -121,6 +128,9 @@ def mock_external_services(respx_mock):
                 "status": "success",
                 "data": {
                     "session_id": "test_session",
+                    "status": "active",
+                    "current_act_id": "act-1",
+                    "current_sequence_id": "seq-1",
                     "world_snapshot": {
                         "player_id": "player_1",
                         "npcs": [],
@@ -142,6 +152,26 @@ def mock_external_services(respx_mock):
                 "data": {
                     "npcs": [],
                     "enemies": [],
+                    "sequence_id": "seq-1",
+                    "goal": "상황에 몰입하기",
+                    "exit_triggers": [],
+                },
+            },
+        )
+    )
+
+    # State Manager Get Act Details
+    respx_mock.get(
+        url__regex=f"{settings.STATE_MANAGER_URL}/state/session/.*/act/details"
+    ).mock(
+        return_value=Response(
+            200,
+            json={
+                "status": "success",
+                "data": {
+                    "act_id": "act-1",
+                    "act_name": "제 1막",
+                    "sequence_ids": ["seq-1", "seq-2"],
                 },
             },
         )

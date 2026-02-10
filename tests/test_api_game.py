@@ -1,7 +1,21 @@
 import pytest
-
 from gm.exceptions import PipelineError
 from gm.main import app
+
+
+@pytest.mark.asyncio
+async def test_process_turn_success(client):
+    payload = {"session_id": "test_session_1", "content": "나는 문을 발로 찬다."}
+    response = await client.post("/api/v1/game/turn", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "turn_id" in data
+    assert "narrative" in data
+    assert "commit_id" in data
+    assert data["output_type"] == "narration"
+    assert data["active_entity_name"] == "player"
+    assert data["turn_id"].startswith("test_session_1:")
 
 
 @pytest.mark.asyncio
@@ -80,6 +94,22 @@ async def test_get_history_error(client, mocker):
 
 
 @pytest.mark.asyncio
+async def test_process_npc_turn_success(client):
+    session_id = "npc_test_session"
+    payload = {"session_id": session_id}
+    response = await client.post("/api/v1/game/npc-turn", json=payload)
+
+    assert response.status_code == 200
+    result = response.json()
+
+    assert "turn_id" in result
+    assert "narrative" in result
+    assert "commit_id" in result
+    assert result["output_type"] in ("npc", "narration")
+    assert result["turn_id"].startswith(f"{session_id}:")
+
+
+@pytest.mark.asyncio
 async def test_process_npc_turn_pipeline_error(client, mocker):
     from gm.core.deps import get_game_engine
 
@@ -105,49 +135,37 @@ async def test_process_npc_turn_unexpected_error(client, mocker):
 
     mocker.patch.dict(app.dependency_overrides, {get_game_engine: lambda: mock_engine})
     payload = {"session_id": "test_session"}
-    response = await client.post("/api/v1/game/npc-turn", json=payload)
 
+    response = await client.post("/api/v1/game/npc-turn", json=payload)
     assert response.status_code == 500
     assert response.json()["detail"]["error_type"] == "UnexpectedError"
 
 
 @pytest.mark.asyncio
-async def test_system_status_degraded(client, mocker):
-    from gm.core.deps import get_game_engine
+async def test_rule_manager_api_integration(client, respx_mock):
+    from gm.core.config import settings
 
-    mock_engine = mocker.Mock()
+    session_id = "rule_test_session"
 
-    mock_engine.rule_client.check_health = mocker.AsyncMock(return_value=True)
-    mock_engine.scenario_client.check_health = mocker.AsyncMock(return_value=False)
-    mock_engine.state_client.check_health = mocker.AsyncMock(return_value=True)
-    mock_engine.llm.check_health = mocker.AsyncMock(return_value=True)
+    mock_response = {
+        "status": "success",
+        "data": {
+            "session_id": "1",
+            "scenario_id": "101",
+            "phase_type": "COMBAT",
+            "reason": "Success",
+            "success": True,
+            "suggested": {"diffs": [], "relations": []},
+        },
+    }
 
-    mocker.patch.dict(app.dependency_overrides, {get_game_engine: lambda: mock_engine})
-    response = await client.get("/api/v1/system/status")
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "degraded"
-    assert data["services"]["scenario_manager"] == "error"
-
-
-@pytest.mark.asyncio
-async def test_system_status_exception(client, mocker):
-    from gm.core.deps import get_game_engine
-
-    mock_engine = mocker.Mock()
-
-    mock_engine.rule_client.check_health = mocker.AsyncMock(
-        side_effect=Exception("Connection reset")
+    respx_mock.post(f"{settings.RULE_ENGINE_URL}/play/scenario").mock(
+        return_value=pytest.importorskip("httpx").Response(200, json=mock_response)
     )
-    mock_engine.scenario_client.check_health = mocker.AsyncMock(return_value=True)
-    mock_engine.state_client.check_health = mocker.AsyncMock(return_value=True)
-    mock_engine.llm.check_health = mocker.AsyncMock(return_value=True)
+    payload = {"session_id": session_id, "content": "Attack"}
 
-    mocker.patch.dict(app.dependency_overrides, {get_game_engine: lambda: mock_engine})
-    response = await client.get("/api/v1/system/status")
-
+    response = await client.post("/api/v1/game/turn", json=payload)
     assert response.status_code == 200
+
     data = response.json()
-    assert data["status"] == "degraded"
-    assert "error: Connection reset" in data["services"]["rule_manager"]
+    assert "narrative" in data

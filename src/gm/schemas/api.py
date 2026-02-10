@@ -114,6 +114,7 @@ class GameTurnResponseV2(BaseModel):
     commit_id: Optional[str] = Field(None, description="상태 확정 ID")
     active_entity_id: Optional[str] = Field(None, description="행동 엔티티 ID")
     active_entity_name: Optional[str] = Field(None, description="행동 엔티티 이름")
+    output_type: str = Field("narration", description="출력 타입 (npc/narration)")
     is_npc_turn: bool = Field(False, description="NPC/환경 턴 여부")
     current_act_id: Optional[str] = Field(None, description="턴 이후 현재 ACT ID")
     current_sequence_id: Optional[str] = Field(
@@ -123,6 +124,7 @@ class GameTurnResponseV2(BaseModel):
         None, description="턴 이후 세션 status (active/ended 등)"
     )
     is_session_ended: bool = Field(False, description="턴 이후 세션 종료 여부")
+    narrative: Optional[str] = Field(None, description="하위 호환성을 위한 전체 서사 텍스트")
     segments: List[Segment] = Field(
         default_factory=list,
         description="구조화 출력 세그먼트 리스트 (action/dialogue/narration).",
@@ -135,7 +137,10 @@ class GameTurnResponseV2(BaseModel):
         ),
     )
     npc_turn: Optional["GameTurnResponseV2"] = Field(
-        None, description="연쇄적으로 발생한 NPC 턴 결과"
+        None, description="연쇄적으로 발생한 첫 번째 NPC 턴 결과"
+    )
+    npc_turns: List["GameTurnResponseV2"] = Field(
+        default_factory=list, description="연쇄적으로 발생한 모든 NPC 턴 리스트"
     )
 
 

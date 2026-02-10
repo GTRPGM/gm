@@ -1,13 +1,22 @@
+import json
 from typing import Any, Dict, List
+from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 
+from gm.core.config import settings
 from gm.interfaces.external import (
     RuleManagerPort,
     ScenarioManagerPort,
     StateManagerPort,
 )
+from gm.plugins.external.http_client import (
+    ScenarioManagerHTTPClient,
+    StateManagerHTTPClient,
+)
 from gm.schemas.common import EntityDiff
+from gm.schemas.scenario import ScenarioConstraintType, ScenarioSuggestion
 
 
 class MockRuleManager(RuleManagerPort):
@@ -27,7 +36,7 @@ class MockScenarioManager(ScenarioManagerPort):
 
 
 class MockStateManager(StateManagerPort):
-    async def commit(self, turn_id: str, diffs: List[EntityDiff]):
+    async def commit(self, session_id: str, diffs: List[EntityDiff], output_type: str):
         return {}
 
     async def get_state(self, session_id: str):
@@ -54,7 +63,6 @@ class MockStateManager(StateManagerPort):
 
 @pytest.mark.asyncio
 async def test_interfaces_instantiation():
-    # 추상 메서드를 모두 구현한 클래스는 인스턴스화 가능해야 함
     rule_mgr = MockRuleManager()
     assert await rule_mgr.check_health() is True
 
@@ -66,10 +74,23 @@ async def test_interfaces_instantiation():
 
 
 def test_abstract_instantiation_error():
-    # 추상 메서드를 구현하지 않으면 인스턴스화 실패
     with pytest.raises(TypeError):
         RuleManagerPort()
     with pytest.raises(TypeError):
         ScenarioManagerPort()
     with pytest.raises(TypeError):
         StateManagerPort()
+
+
+@pytest.mark.asyncio
+async def test_state_update_act_payload_matches_state_contract(respx_mock):
+    client = StateManagerHTTPClient()
+    route = respx_mock.put(f"{settings.STATE_MANAGER_URL}/state/session/s1/act").mock(
+        return_value=httpx.Response(200, json={"status": "success", "data": {}})
+    )
+
+    await client.update_act("s1", "act-2", "seq-2-1")
+
+    payload = json.loads(route.calls[0].request.content)
+    assert payload["new_act_id"] == "act-2"
+    assert payload["new_sequence_id"] == "seq-2-1"

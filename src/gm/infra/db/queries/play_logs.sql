@@ -45,5 +45,6 @@ INSERT INTO play_logs (
     sequence_seq,
     active_entity_id,
     world_snapshot
+    , meta_info
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
