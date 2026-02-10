@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, TypedDict
 
-from gm.schemas.common import EntityDiff
+from gm.schemas.common import EntityDiff, RelationDiff
 from gm.schemas.rule_engine import RuleOutcome
 from gm.schemas.scenario import ScenarioSuggestion
 
@@ -36,6 +36,7 @@ class TurnContext(TypedDict, total=False):
     scenario_suggestion: Optional[ScenarioSuggestion]
 
     final_diffs: List[EntityDiff]
+    final_relations: List[RelationDiff]
     commit_id: Optional[str]
 
     # --- World State ---
