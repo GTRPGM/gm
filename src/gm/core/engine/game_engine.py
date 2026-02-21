@@ -103,8 +103,8 @@ class GameEngine:
         }
 
         # 3. NPC 턴 실행 여부 판단 및 실행
-        after = await self.state_client.get_state(session_id)
-        if after.get("entities") and str(after.get("status", "")).lower() != "ended":
+        after = await self.state_handler.fetch_world_state(session_id, "", "")
+        if str(after.get("status", "")).lower() != "ended":
             pools = EngineUtils.build_actor_pool(after)
             queue = [e["scenario_id"] for e in pools["enemies"] if e["alive"]] + [
                 n["scenario_id"] for n in pools["npcs"]
@@ -120,7 +120,7 @@ class GameEngine:
                 resp["npc_turn"] = npc_turns[0]
 
         # 4. 최종 상태 동기화
-        latest = await self.state_client.get_state(session_id)
+        latest = await self.state_handler.fetch_world_state(session_id, "", "")
         resp.update(
             {
                 "current_act_id": latest.get("current_act_id"),
@@ -162,6 +162,8 @@ class GameEngine:
             segments.insert(
                 1, {"type": SegmentType.DIALOGUE, "role": name, "content": diag}
             )
+        latest = await self.state_client.get_state(session_id)
+        latest_status = str(latest.get("status", "")).lower()
 
         return {
             "turn_id": res["turn_id"],
@@ -172,9 +174,7 @@ class GameEngine:
             "narrative": str(res.get("narrative", "")),
             "is_npc_turn": True,
             "output_type": "npc",
-            "is_session_ended": str(res.get("world_snapshot", {}).get("status", ""))
-            .lower()
-            == "ended",
+            "is_session_ended": latest_status == "ended",
         }
 
     # --- LangGraph Nodes ---

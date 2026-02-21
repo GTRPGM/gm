@@ -9,10 +9,8 @@ class CombatChecker:
         for enemy in enemies:
             if not isinstance(enemy, dict):
                 continue
-            if (
-                current_seq_id
-                and str(enemy.get("assigned_sequence_id") or "") != current_seq_id
-            ):
+            assigned_seq = str(enemy.get("assigned_sequence_id") or "").strip()
+            if current_seq_id and assigned_seq and assigned_seq != current_seq_id:
                 continue
             if bool(enemy.get("is_defeated")):
                 continue
@@ -35,10 +33,8 @@ class CombatChecker:
         for enemy in snapshot.get("enemies", []) or []:
             if not isinstance(enemy, dict):
                 continue
-            if (
-                current_seq_id
-                and str(enemy.get("assigned_sequence_id") or "") != current_seq_id
-            ):
+            assigned_seq = str(enemy.get("assigned_sequence_id") or "").strip()
+            if current_seq_id and assigned_seq and assigned_seq != current_seq_id:
                 continue
             if bool(enemy.get("is_defeated")):
                 continue

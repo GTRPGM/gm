@@ -29,7 +29,37 @@ class StateHandler:
             logger.error(f"Failed fetch: {e}"); return {}
 
     async def commit_changes(self, sid: str, tid: str, diffs: List, rels: List, scenario: Any) -> str:
-        res = await self.state_client.commit(tid, diffs, rels)
+        filtered_rels = rels or []
+        if filtered_rels:
+            snap = await self.fetch_world_state(sid, "", "")
+            allowed_ids: set[str] = set()
+            player_id = str((snap.get("player") or {}).get("player_id") or "").strip()
+            if player_id:
+                allowed_ids.add(player_id)
+            allowed_ids.add("player")
+            for key in ("npcs", "enemies"):
+                for entity in (snap.get(key) or []):
+                    for attr in ("scenario_entity_id", "npc_id", "enemy_id", "id"):
+                        value = str(entity.get(attr) or "").strip()
+                        if value:
+                            allowed_ids.add(value)
+
+            valid_rels: list = []
+            for rel in filtered_rels:
+                cause_id = str(getattr(rel, "cause_entity_id", "") or "").strip()
+                effect_id = str(getattr(rel, "effect_entity_id", "") or "").strip()
+                if cause_id in allowed_ids and effect_id in allowed_ids:
+                    valid_rels.append(rel)
+                else:
+                    logger.warning(
+                        "Drop invalid relation diff: %s -> %s (allowed=%s)",
+                        cause_id,
+                        effect_id,
+                        len(allowed_ids),
+                    )
+            filtered_rels = valid_rels
+
+        res = await self.state_client.commit(tid, diffs, filtered_rels)
         trans = False
         if scenario:
             if hasattr(scenario, "next_act_id") and scenario.next_act_id:
